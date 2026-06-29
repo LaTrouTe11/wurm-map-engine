@@ -25,7 +25,7 @@ jobs:
           get -O . top_layer.map
           bye
           EOF
-          java -Djava.awt.headless=true -Xmx5g -jar WurmGenMap.jar
+          java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
       - name: Push vers dépôt Web
         run: |
