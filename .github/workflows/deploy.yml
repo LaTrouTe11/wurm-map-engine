@@ -1,9 +1,47 @@
-- name: Génération
+name: Test Generation SFTP
+
+on:
+  workflow_dispatch: # Permet de lancer le test manuellement
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installation Java et LFTP
+        run: sudo apt-get update && sudo apt-get install -y lftp openjdk-17-jre
+
+      - name: Test Connexion et Telechargement
         run: |
           mkdir -p sqlite
-          # Vérifiez bien ces lignes ci-dessous :
+          # Tentative de connexion avec port 2022
           lftp -u "${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }}" sftp://${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} <<EOF
           set sftp:auto-confirm yes
           set ssl:verify-certificate no
           set xfer:clobber on
-          # ... reste du script
+          cd /dist/Doriath-4k-20/sqlite/
+          mget -O sqlite/ wurmzones.db wurmitems.db wurmplayers.db
+          cd ../
+          get -O . top_layer.map
+          bye
+          EOF
+
+      - name: Execution du Moteur (WurmMapGen.jar)
+        run: |
+          # On verifie si le dossier template existe, sinon on le cree pour eviter l'erreur
+          mkdir -p template
+          java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
+
+      - name: Mise a jour du Depot Web
+        run: |
+          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
+          mkdir -p wurm-livemap-doriath/tiles
+          # Copie des fichiers generes vers le dossier tiles du site web
+          cp -f *.png *.json wurm-livemap-doriath/tiles/ 2>/dev/null || :
+          cd wurm-livemap-doriath
+          git config user.name "Bot-Auto"
+          git config user.email "bot@bot.com"
+          git add .
+          git commit -m "Auto: Mise à jour des tuiles via GitHub Action" || echo "Aucun changement"
+          git push
