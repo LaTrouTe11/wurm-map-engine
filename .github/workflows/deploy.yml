@@ -1,25 +1,40 @@
-# WurmMapGen Configuration - Version corrigée
-# Ce fichier doit être nommé WurmMapGen.properties
+name: Génération et Push vers le Web
 
-# --- Chemins ---
-# Le dossier sqlite doit être à la racine
-sqliteDir=./sqlite
-# Le dossier output doit être à la racine
-outputDir=./tiles
-# Définit la racine comme dossier de template pour éviter l'erreur de répertoire
-templateDir=.
+on:
+  workflow_dispatch:
 
-# --- Paramètres du serveur ---
-# Vérifiez que ce nom correspond exactement au dossier de vos bases de données
-serverName=Doriath-4k-20
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Installation
+        run: sudo apt-get update && sudo apt-get install -y lftp openjdk-17-jre
 
-# --- Options de rendu ---
-renderMarkers=true
-renderPlayers=true
-renderCaves=false
+      - name: Génération
+        run: |
+          mkdir -p sqlite
+          lftp -u "${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }}" sftp://${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} <<EOF
+          set sftp:auto-confirm yes
+          set ssl:verify-certificate no
+          set xfer:clobber on
+          cd /dist/Doriath-4k-20/sqlite/
+          mget -O sqlite/ wurmzones.db wurmitems.db wurmplayers.db
+          cd ../
+          get -O . top_layer.map
+          bye
+          EOF
+          java -Djava.awt.headless=true -Xmx5g -jar WurmGenMap.jar
 
-# --- Configuration de la carte ---
-maxZoom=5
-
-# --- Technique ---
-headless=true
+      - name: Push vers dépôt Web
+        run: |
+          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
+          mkdir -p wurm-livemap-doriath/tiles
+          cp -f *.png *.json wurm-livemap-doriath/tiles/ 2>/dev/null || :
+          cd wurm-livemap-doriath
+          git config user.name "Bot-Auto"
+          git config user.email "bot@bot.com"
+          git add .
+          git commit -m "Auto: Mise à jour tuiles"
+          git push
