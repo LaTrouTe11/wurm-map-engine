@@ -25,6 +25,7 @@ jobs:
           get -O . top_layer.map
           bye
           EOF
+          # Lancement du moteur avec le fichier properties
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
       - name: Push vers dépôt Web
@@ -36,5 +37,6 @@ jobs:
           git config user.name "Bot-Auto"
           git config user.email "bot@bot.com"
           git add .
-          git commit -m "Auto: Mise à jour tuiles"
+          # On évite l'erreur si rien n'a changé
+          git commit -m "Auto: Mise à jour tuiles" || echo "Aucun changement à pousser."
           git push
