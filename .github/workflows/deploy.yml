@@ -1,0 +1,49 @@
+name: Génération et Push vers le Web
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Installation
+        run: sudo apt-get update && sudo apt-get install -y lftp openjdk-17-jre
+
+      - name: Génération
+        run: |
+          # 1. Téléchargement des bases sqlite
+          mkdir -p sqlite
+          lftp -u "${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }}" sftp://${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} <<EOF
+          set sftp:auto-confirm yes
+          set ssl:verify-certificate no
+          set xfer:clobber on
+          cd /dist/Doriath-4k-20/sqlite/
+          mget -O sqlite/ wurmzones.db wurmitems.db wurmplayers.db
+          bye
+          EOF
+          
+          # 2. Lancement du générateur (utilise votre WurmMapGen.properties)
+          java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
+
+      - name: Push vers dépôt Web
+        run: |
+          # Cloner votre dépôt Web
+          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
+          
+          # Copier les fichiers générés (.png et .json) vers le dossier tiles du dépôt Web
+          mkdir -p wurm-livemap-doriath/tiles
+          cp -f *.png *.json wurm-livemap-doriath/tiles/ 2>/dev/null || :
+          
+          # Copier la config si elle existe
+          if [ -f config.json ]; then cp config.json wurm-livemap-doriath/data/config.json; fi
+          
+          # Pousser vers le Web
+          cd wurm-livemap-doriath
+          git config user.name "Bot-Auto"
+          git config user.email "bot@bot.com"
+          git add .
+          git commit -m "Auto: Mise à jour des données de carte"
+          git push
