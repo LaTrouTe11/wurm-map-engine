@@ -1,42 +1,9 @@
-name: Génération et Push vers le Web
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Installation
-        run: sudo apt-get update && sudo apt-get install -y lftp openjdk-17-jre
-
-      - name: Génération
+- name: Génération
         run: |
           mkdir -p sqlite
+          # Vérifiez bien ces lignes ci-dessous :
           lftp -u "${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }}" sftp://${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} <<EOF
           set sftp:auto-confirm yes
           set ssl:verify-certificate no
           set xfer:clobber on
-          cd /dist/Doriath-4k-20/sqlite/
-          mget -O sqlite/ wurmzones.db wurmitems.db wurmplayers.db
-          cd ../
-          get -O . top_layer.map
-          bye
-          EOF
-          # Lancement du moteur avec le fichier properties
-          java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
-
-      - name: Push vers dépôt Web
-        run: |
-          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
-          mkdir -p wurm-livemap-doriath/tiles
-          cp -f *.png *.json wurm-livemap-doriath/tiles/ 2>/dev/null || :
-          cd wurm-livemap-doriath
-          git config user.name "Bot-Auto"
-          git config user.email "bot@bot.com"
-          git add .
-          # On évite l'erreur si rien n'a changé
-          git commit -m "Auto: Mise à jour tuiles" || echo "Aucun changement à pousser."
-          git push
+          # ... reste du script
