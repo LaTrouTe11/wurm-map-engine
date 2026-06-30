@@ -1,9 +1,23 @@
-- name: Download Data via SFTP
+name: Deploy Wurm Map
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Engine
+        uses: actions/checkout@v4
+
+      - name: Download Data via SFTP
         run: |
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # On cherche exactement où sont les fichiers .db
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
           find / -name "*.db" 2>/dev/null
           bye
