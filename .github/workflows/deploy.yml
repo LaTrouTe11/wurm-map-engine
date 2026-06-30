@@ -18,7 +18,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
+          # Connexion SFTP et liste complète des fichiers pour debug
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          find / -name "*.db" 2>/dev/null
+          ls -R
           bye
           EOF
+
+      - name: Generate Map
+        run: |
+          java -jar WurmMapGen.jar
+
+      - name: Clone Site Web
+        run: |
+          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
+
+      - name: Copy Maps to Site
+        run: |
+          cp -r tiles/* wurm-livemap-doriath/tiles/
+
+      - name: Push to Site Web
+        run: |
+          cd wurm-livemap-doriath
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git commit -m "Mise à jour automatique de la carte"
+          git push https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git main
