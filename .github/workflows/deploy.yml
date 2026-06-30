@@ -7,9 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write # <-- Obligatoire pour corriger l'erreur 404 HttpError sur l'API Pages
+  contents: write # Requis pour pousser sur la branche gh-pages
 
 concurrency:
   group: "pages"
@@ -17,9 +15,6 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -123,38 +118,12 @@ jobs:
           cp template/index.html ./index.html
           echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
 
-      # 6. Sauvegarde globale et sécurisée adaptée aux fichiers générés (Évite l'erreur pathspec 128)
-      - name: Pousser les fichiers corriges sur GitHub
-        run: |
-          git config --local user.name "Doriath-Map-Bot"
-          git config --local user.email "actions@github.com"
-          
-          git add index.html || true
-          git add app/map.js || true
-          
-          if [ -d "data" ]; then git add data/; fi
-          if [ -d "images" ]; then git add images/; fi
-          
-          if ! git diff-index --quiet HEAD --; then
-            git commit -m "Mise a jour automatique WurmMapGen v2.33 [skip ci]"
-            git push origin main
-            echo "Succès : Les fichiers modifiés ont été enregistrés sur votre dépôt GitHub !"
-          else
-            echo "Aucune modification détectée dans les fichiers."
-          fi
-
-      # 7. Préparation de l'envoi vers le site web (Version v5 requise pour Node 24 par défaut)
-      - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v5
+      # 6. MÉTHODE DE SECOURS IMMUABLE : Déploiement direct de votre site sur la branche gh-pages (Évite le bug 404 de l'API)
+      - name: Deploy to gh-pages Branch
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          path: '.'
-
-      # 8. Déploiement final en ligne sur GitHub Pages
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-
+          folder: '.' # Déploie l'intégralité du dossier racine compilé à l'instant
+          branch: gh-pages # Pousse sur la branche d'hébergement classique
 
 
 
