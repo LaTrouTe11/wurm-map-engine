@@ -1,44 +1,10 @@
-name: Deploy Wurm Map
-
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Engine
-        uses: actions/checkout@v4
-
-      - name: Download Data via SFTP
+- name: Download Data via SFTP
         run: |
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion directe au dossier sqlite
+          # On cherche exactement où sont les fichiers .db
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          cd /home/container/dist/Doriath-4k-20/sqlite
-          get wurmplayers.db
-          get wurm.db
+          find / -name "*.db" 2>/dev/null
           bye
           EOF
-
-      - name: Generate Map
-        run: |
-          java -jar WurmMapGen.jar
-
-      - name: Copy Maps to Site
-        run: |
-          cp -r tiles/* wurm-livemap-doriath/tiles/
-
-      - name: Push to Site Web
-        run: |
-          cd wurm-livemap-doriath
-          git config user.name "GitHub Action"
-          git config user.email "action@github.com"
-          git add .
-          git commit -m "Mise à jour automatique de la carte"
-          git push https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git main
