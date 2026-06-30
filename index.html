@@ -5,7 +5,8 @@
 	<meta charset="utf-8"/>
 	<meta name="viewport" content="initial-scale=1.0, user-scalable=no"/>
 
-	<link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css">
+	<!-- Styles de l'interface graphique -->
+	<link rel="stylesheet" href="https://cloudflare.com">
 	<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:400,700">
 	<link rel="stylesheet" href="dist/Leaflet.Coordinates-0.1.5.css">
 	<link rel="stylesheet" href="css/style.css">
@@ -14,7 +15,7 @@
 
 <!-- Interface elements -->
 <div id="gui" :class="{sidebar: sidebarVisible}">
-	<a id="sidebar-toggle" class="absolute transition z-gui" @click="sidebarVisible = !sidebarVisible">&#8801;</a>
+	<a id="sidebar-toggle" class="absolute transition z-gui" @click="sidebarVisible = !sidebarVisible">≡</a>
 	<div id="sidebar" class="absolute transition z-gui" :class="{loaded: loaded}">
 		<div class="block padding">
 			<h1>{{serverName}}</h1>
@@ -23,17 +24,6 @@
 			<div id="playercount" v-text="playerCountLabel"></div>
 			{{/enableRealtimeMarkers}}
 		</div>
-
-		{{#enableRealtimeMarkers}}
-			{{#showPlayers}}
-			<div class="block">
-				<label for="option-show-players" class="flex">
-					<input type="checkbox" class="transition" id="option-show-players" v-model="showPlayers">
-					<span>Show players</span>
-				</label>
-			</div>
-			{{/showPlayers}}
-		{{/enableRealtimeMarkers}}
 
 		{{#showDeeds}}
 		<div class="block">
@@ -79,14 +69,11 @@
 		<div class="block attribution">
 			<p>
 				<a href="https://github.com/woubuc/WurmMapGen" target="_blank" rel="noreferrer noopener">WurmMapGen</a>
-				powered by
-				<a href="http://leafletjs.com/" target="_blank" rel="noreferrer noopener">Leaflet</a>
+				powered by <a href="http://leafletjs.com/" target="_blank" rel="noreferrer noopener">Leaflet</a>
 			</p>
-
 			<p>Developed and maintained by <a href="https://github.com/woubuc">woubuc</a></p>
 			<p>Based on code by <a href="https://github.com/Garrett92/">Garrett92</a></p>
 		</div>
-
 	</div>
 
 	<div id="search" class="absolute transition z-gui" :class="{open: searchResultsOpen}">
@@ -100,21 +87,16 @@
 	<div id="map" class="absolute transition z-page"></div>
 </div>
 
-
-
-<!-- Load dependencies -->
-<script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js" defer integrity="sha384-ic4t376ZLdSPIUOxDpNXqU0UWe1c/2BkOXxiirQWAgKZzMJ6njfS1jdzbyMJbfil" crossorigin="anonymous"></script>
+<!-- Chargement ordonné des dépendances logicielles sans blocage -->
+<script src="dist/leaflet-local.js"></script>
 <script src="dist/Leaflet.Coordinates-0.1.5.min.js" defer></script>
+<script src="https://cloudflare.com"></script>
+<script src="https://cloudflare.com"></script>
+<script src="https://cloudflare.com"></script>
+<script src="dist/vue-local.js"></script>
 
-<script src="https://unpkg.com/cookies-js@1.2.3/dist/cookies.min.js" integrity="sha384-Sz/TO/SdmTLSbgJdFXq+xsTAMk7YO3Ydk/LaJbERL9zgiFOpl39JoxkpLNBl0kFo" crossorigin="anonymous"></script>
-
-<script src="https://unpkg.com/whatwg-fetch@2.0.3/fetch.js" defer integrity="sha384-KaKx4aJnrltBb2dne61B/MRPA4uRfQvv6YW99RgjHax8TRjFxcC4BC19EEX0te/6" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/promise-polyfill@6.1.0/promise.min.js" defer integrity="sha384-LSmcy/rdMAgofokne7lmSBxJnXdRcj4SKZwPD+CE8At+QhWXRPvESLzhy/N2zHX+" crossorigin="anonymous"></script>
-
-<script src="https://unpkg.com/vue@2.5.9/dist/vue.min.js" defer integrity="sha384-zqrofuOynJ/XqmhOlwCW6O4dBXHCFqHlF9NP1NXopaE/7kBbN5QLwAvUiofvPrFi" crossorigin="anonymous"></script>
-
-<!-- Load app -->
-<script>window.WurmMapGen = {}; // Create a namespace for the app</script>
+<!-- Lancement des composants du coeur de l'application -->
+<script>window.WurmMapGen = {};</script>
 <script type="text/javascript" defer src="app/util.js"></script>
 <script type="text/javascript" defer src="app/markers.js"></script>
 <script type="text/javascript" defer src="app/map.js"></script>
