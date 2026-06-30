@@ -13,12 +13,18 @@ jobs:
       - name: Checkout Engine
         uses: actions/checkout@v4
 
-      - name: Download Data via FTP
+      - name: Download Data via SFTP
         run: |
+          # Installation des outils nécessaires
           sudo apt-get update
-          sudo apt-get install -y lftp
-          # Utilisation de mget et timeout pour éviter le blocage
-          lftp -c "set ftp:ssl-allow no; set net:timeout 10; set net:max-retries 1; open -u ${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }} -p ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_HOST }}; mget wurmplayers.db wurm.db; quit"
+          sudo apt-get install -y openssh-client sshpass
+          
+          # Connexion SFTP directe (équivalente à FileZilla)
+          sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
+          get wurmplayers.db
+          get wurm.db
+          bye
+          EOF
 
       - name: Generate Map
         run: |
@@ -30,8 +36,8 @@ jobs:
 
       - name: Copy Maps to Site
         run: |
-          # On copie le contenu généré vers le dossier du site cloné
-          # Assurez-vous que le dossier 'tiles' existe bien après l'étape Generate Map
+          # On copie le contenu vers le dossier du site cloné
+          # Assurez-vous que le dossier 'tiles' est bien celui utilisé par WurmMapGen
           cp -r tiles/* wurm-livemap-doriath/tiles/
 
       - name: Push to Site Web
