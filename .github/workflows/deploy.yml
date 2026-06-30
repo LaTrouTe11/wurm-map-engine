@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write # Requis pour pousser sur la branche gh-pages
+  contents: write
 
 concurrency:
   group: "pages"
@@ -118,12 +118,40 @@ jobs:
           cp template/index.html ./index.html
           echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
 
-      # 6. MÉTHODE DE SECOURS IMMUABLE : Déploiement direct de votre site sur la branche gh-pages (Évite le bug 404 de l'API)
+      # 6. NETTOYAGE CRITIQUE ANTI-BUG DE SÉCURITÉ : Supprime les faux fichiers de clés de la bibliothèque
+      - name: Purge False Security Keys
+        run: |
+          if [ -d "node_modules/ssh2/test" ]; then
+            echo "Suppression des fausses clés privées de simulation..."
+            rm -rf node_modules/ssh2/test
+          fi
+
+      # 7. Sauvegarde globale et sécurisée de vos fichiers d'images de terrain réels
+      - name: Pousser les fichiers corriges sur GitHub
+        run: |
+          git config --local user.name "Doriath-Map-Bot"
+          git config --local user.email "actions@github.com"
+          
+          git add index.html || true
+          git add app/map.js || true
+          
+          if [ -d "data" ]; then git add data/; fi
+          if [ -d "images" ]; then git add images/; fi
+          
+          if ! git diff-index --quiet HEAD --; then
+            git commit -m "Mise a jour automatique complète WurmMapGen [skip ci]"
+            git push origin main
+            echo "Succès : L'arborescence propre a été enregistrée !"
+          else
+            echo "Aucune modification détectée dans les fichiers."
+          fi
+
+      # 8. Déploiement direct sur la branche d'hébergement gh-pages
       - name: Deploy to gh-pages Branch
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: '.' # Déploie l'intégralité du dossier racine compilé à l'instant
-          branch: gh-pages # Pousse sur la branche d'hébergement classique
+          folder: '.'
+          branch: gh-pages
 
 
 
