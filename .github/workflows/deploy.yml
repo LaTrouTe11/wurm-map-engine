@@ -33,7 +33,7 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Generation des Images du Terrain
+      - name: 4. Generation des 256 Images du Terrain
         run: |
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
@@ -59,30 +59,29 @@ jobs:
           mkdir -p output_tiles/images output_tiles/data
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           
-          # Gabarit de base requis par le compilateur d'origine
-          cat << 'EOF' > template/index.html
-          <!DOCTYPE html>
-          <html><head><title>WurmMapGen</title></head><body></body></html>
-          EOF
-          
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Creation du Pack Web Propre Complet 2026
+      - name: 5. Extraction et Assemblage du Pack Racine Absolu 2026
         run: |
           mkdir -p /tmp/site_propre/images /tmp/site_propre/data /tmp/site_propre/app /tmp/site_propre/css /tmp/site_propre/markers /tmp/site_propre/dist /tmp/site_propre/includes
           
-          # Copie globale des fichiers générés
-          cp -rf template/* /tmp/site_propre/ 2>/dev/null || true
+          # 1. Extraction et aspiration de TOUS les répertoires d'interface générés en cache par l'application
+          if [ -d "template" ]; then
+            cp -rf template/* /tmp/site_propre/
+          fi
+
+          # 2. Rapatriement forcé des sous-dossiers systèmes WurmMapGen s'ils ont été créés à la racine
+          cp -rf app/ css/ markers/ dist/ includes/ /tmp/site_propre/ 2>/dev/null || true
           
-          # Rapatriement et remontée forcée des tuiles de zoom maximal (dossier 5)
+          # 3. Rapatriement et remontée des tuiles géographiques PNG et JSON
           if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
           cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
 
-          # FIX CRUCIAL LIGNE 68 : Écriture forcée du fichier config.json requis par main.js
+          # 4. Écriture forcée du fichier de configuration requis par main.js pour débloquer l'affichage
           cat << 'EOF' > /tmp/site_propre/data/config.json
           {
             "serverName": "[QC/FR/CAN] QBC Doriath",
@@ -108,14 +107,14 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Transfert et Envoi du Site Web Corrigé
+      - name: 7. Deploiement de l Arborescence Miroir Totale vers Depot 1
         run: |
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Injection de la structure corrigée
+          # Copie miroir complète de l'ensemble de l'écosystème graphique
           cp -rf /tmp/site_propre/* espace_depot1/
           
-          # Francisation à la volée du fichier index.html d'origine s'il existe
+          # Correction textuelle à la volée du gabarit HTML s'il existe pour boucher les trous de rendu
           if [ -f "espace_depot1/index.html" ]; then
             sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' espace_depot1/index.html 2>/dev/null || true
             sed -i 's/Show deeds/Afficher les villages/g' espace_depot1/index.html 2>/dev/null || true
@@ -127,8 +126,9 @@ jobs:
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add -A .
-          git commit -m "Console QBC 2026 : Correction config.json et allumage du terrain" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Injection complète de tous les dossiers racines système" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
