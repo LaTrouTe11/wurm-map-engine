@@ -15,13 +15,12 @@ jobs:
 
       - name: Download Data via SFTP
         run: |
-          # Installation des outils nécessaires
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion SFTP, liste les fichiers pour debug, puis tente le téléchargement
+          # Connexion, scan complet pour trouver les fichiers, puis téléchargement
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          ls -l
+          ls -R
           get wurmplayers.db
           get wurm.db
           bye
