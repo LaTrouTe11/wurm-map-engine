@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
   pages: write
-  id-token: write
+  id-token: write # <-- Obligatoire pour corriger l'erreur 404 HttpError sur l'API Pages
 
 concurrency:
   group: "pages"
@@ -123,7 +123,7 @@ jobs:
           cp template/index.html ./index.html
           echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
 
-      # 6. Sauvegarde globale et sécurisée adaptée aux fichiers générés
+      # 6. Sauvegarde globale et sécurisée adaptée aux fichiers générés (Évite l'erreur pathspec 128)
       - name: Pousser les fichiers corriges sur GitHub
         run: |
           git config --local user.name "Doriath-Map-Bot"
@@ -143,11 +143,11 @@ jobs:
             echo "Aucune modification détectée dans les fichiers."
           fi
 
-      # 7. Préparation de l'envoi propre (Utilisation du chemin racine fixe)
+      # 7. Préparation de l'envoi vers le site web (Version v5 requise pour Node 24 par défaut)
       - name: Upload Pages Artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
-          path: './' # Cible explicitement la racine courante du runner
+          path: '.'
 
       # 8. Déploiement final en ligne sur GitHub Pages
       - name: Deploy to GitHub Pages
