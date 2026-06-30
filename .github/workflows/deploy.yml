@@ -1,4 +1,3 @@
-
 name: Deploy Wurm Map
 
 on:
@@ -23,42 +22,72 @@ jobs:
 
       - name: 3. Telechargement
         run: |
-          mkdir -p WurmGenMap/sqlite
+          mkdir -p template/sqlite
           lftp -c "set sftp:auto-confirm yes; \
                    set ssl:verify-certificate no; \
                    set xfer:clobber on; \
                    open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }}; \
                    cd /home/container/dist/Doriath-4k-20/sqlite/ || cd dist/Doriath-4k-20/sqlite/; \
-                   mget -O WurmGenMap/sqlite/ wurmplayers.db wurm.db; \
+                   mget -O template/sqlite/ wurmplayers.db wurm.db; \
                    cd ../; \
-                   get -O WurmGenMap/ top_layer.map; \
+                   get -O template/ top_layer.map; \
                    bye"
 
-      - name: 4. Generation
+      - name: 4. Generation avec Securite
         run: |
-          # 1. Copie du fichier de config à la racine pour le programme
-          cp WurmGenMap/WurmMapGen.properties .
+          # 1. Protection : Création et injection automatique de la config RMI directement dans template
+          cat << 'EOF' > template/WurmMapGen.properties
+          serverName=[QC/FR/CAN] QBC Doriath
+          wurmMapLocation=.
+          saveLocation=.
+          dbDir=./sqlite/
+          zonesDb=wurm.db
+          itemsDb=wurm.db
+          playersDb=wurmplayers.db
+          actualMapSize=4096
+          mapTileSize=256
+          mapMaxZoom=5
+          mapMinZoom=0
+          nativeZoom=5
+          markerType=2
+          enableRealtimeMarkers=true
+          usePHP=false
+          rmiHost=${{ secrets.LEGION_HOST }}
+          rmiPort=5606
+          rmiPassword=${{ secrets.RMI_PASSEWORD }}
+          EOF
           
-          # 2. Lancement du générateur
-          java -Djava.awt.headless=true -Xmx5g -jar WurmGenMap/WurmMapGen.jar
+          # 2. On se déplace dans le dossier template où se trouve ton jar original
+          cd template
           
-          # 3. Déplacement des tuiles vers template/tiles
-          mkdir -p template/tiles
-          find . -maxdepth 1 \( -name "*.png" -o -name "*.json" \) -exec mv {} template/tiles/ \; || echo "Aucune tuile"
+          # 3. Lancement du générateur Java à l'abri
+          java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
           
-          # 4. Copie de la config générée (pour le bug TypeError)
-          if [ -f config.json ]; then
-            cp config.json template/data/config.json
+          # 4. Organisation automatique des tuiles générées
+          mkdir -p tiles data
+          find . -maxdepth 1 \( -name "*.png" -o -name "*.json" \) -exec mv {} tiles/ \; || echo "Aucune tuile"
+          if [ -f tiles/config.json ]; then
+            cp tiles/config.json data/config.json
           fi
           
-          # 5. Nettoyage
-          rm -f WurmMapGen.properties
-          rm -f top_layer.map
+          # 5. Nettoyage des fichiers serveurs lourds
+          rm -f top_layer.map WurmMapGen.properties
+          rm -rf sqlite
 
-      - name: 5. Upload Pages Artifact
+      - name: 5. Reparation et Securisation Automatique de l'Index
+        run: |
+          # Le script Linux injecte les vraies dimensions 4k (0, 4096) sans passer par l'IA
+          if [ -f "template/index.html" ]; then
+            sed -i 's/map.unproject(\[,\s*\]/map.unproject(/g' template/index.html 2>/dev/null || true
+            sed -i 's/map.unproject(\[\s*,\s*\]/map.unproject(/g' template/index.html 2>/dev/null || true
+            sed -i "s|'images/{x}-{y}.png'|'tiles/{x}-{y}.png'|g" template/index.html 2>/dev/null || true
+          fi
+
+      - name: 6. Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: './template'
 
-      - name: 6. Deploy to GitHub Pages
+      - name: 7. Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+
