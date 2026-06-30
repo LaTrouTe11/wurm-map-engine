@@ -1,3 +1,4 @@
+
 name: Generateur et Liaison Inter-Depots
 
 on:
@@ -49,14 +50,15 @@ jobs:
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
       - name: 5. Connexion Securisee et Push vers le Depot 1 (Site Web)
-        env:
-          CLE_SECRET: ${{ secrets.MY_DEPLOY_TOKEN }}
         run: |
           git config --global user.name "Robot Coordinateur Wurm"
           git config --global user.email "action@github.com"
           
-          # FIX: Utilisation d'une variable d'environnement pour bloquer les coupures de l'IA sur l'URL
-          git clone "https://${CLE_SECRET}@://github.com" /tmp/depot_web
+          # FIX DÉFINITIF DE SÉCURITÉ : Utilisation de l'authentification par jeton encodé sans injection directe dans l'URL
+          git config --global http.https://github.com "Authorization: basic $(echo -n x:${{ secrets.MY_DEPLOY_TOKEN }} | base64)"
+          
+          # Clonage propre avec URL standard
+          git clone https://github.com /tmp/depot_web
           
           mkdir -p /tmp/depot_web/images /tmp/depot_web/data
           if [ -d "images" ]; then cp -rf images/*.png /tmp/depot_web/images/ 2>/dev/null || true; fi
@@ -67,4 +69,3 @@ jobs:
           git diff-index --quiet HEAD || git commit -m "MAJ auto : synchronisation des donnees depuis le depot generateur"
           git push origin main || true
           rm -rf /tmp/depot_web
-
