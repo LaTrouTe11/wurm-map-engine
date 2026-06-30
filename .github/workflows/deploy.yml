@@ -123,33 +123,31 @@ jobs:
           cp template/index.html ./index.html
           echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
 
-      # 6. Sauvegarde globale et sécurisée de TOUS les dossiers générés (Images + Data JSON)
+      # 6. Sauvegarde globale et sécurisée adaptée aux fichiers générés
       - name: Pousser les fichiers corriges sur GitHub
         run: |
           git config --local user.name "Doriath-Map-Bot"
           git config --local user.email "actions@github.com"
           
-          # Force l'ajout de tout ce qui a été modifié ou créé par le générateur Wurm
           git add index.html || true
           git add app/map.js || true
           
-          # On force l'ajout complet des répertoires pour ne rien oublier
           if [ -d "data" ]; then git add data/; fi
           if [ -d "images" ]; then git add images/; fi
           
           if ! git diff-index --quiet HEAD --; then
-            git commit -m "Mise a jour automatique complète WurmMapGen [skip ci]"
+            git commit -m "Mise a jour automatique WurmMapGen v2.33 [skip ci]"
             git push origin main
-            echo "Succès : L'arborescence complète a été enregistrée sur le Dépôt 1 !"
+            echo "Succès : Les fichiers modifiés ont été enregistrés sur votre dépôt GitHub !"
           else
             echo "Aucune modification détectée dans les fichiers."
           fi
 
-      # 7. Préparation de l'envoi (Dépôt 1 utilise la version Pages stable)
+      # 7. Préparation de l'envoi propre (Utilisation du chemin racine fixe)
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: './' # Cible explicitement la racine courante du runner
 
       # 8. Déploiement final en ligne sur GitHub Pages
       - name: Deploy to GitHub Pages
