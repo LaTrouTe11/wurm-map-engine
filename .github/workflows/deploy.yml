@@ -1,177 +1,155 @@
-name: Generateur et Liaison Inter-Depots
+name: "Mise a jour Carte Doriath"
 
 on:
   push:
-    branches: [ main, master ]
-  schedule:
-    - cron: '0 */6 * * *'
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
+    environment:
+      name: github-pages
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout du Depot 2 (Générateur)
-        uses: actions/checkout@v4
-
-      - name: 2. Installation des paquets requis et des Polices
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y lftp openjdk-17-jre fontconfig
-
-      - name: 3. Telechargement des donnees Legion Hosting
-        run: |
-          mkdir -p ./sqlite
-          lftp -c "set sftp:auto-confirm yes; \
-                   set ssl:verify-certificate no; \
-                   set xfer:clobber on; \
-                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }}; \
-                   cd /dist/Doriath-4k-20/sqlite/; \
-                   mget -O ./sqlite/ wurmzones.db wurmitems.db wurmplayers.db; \
-                   cd ../; \
-                   get -O . top_layer.map; \
-                   bye"
-
-      - name: 4. Generation des 256 Images du Terrain
-        run: |
-          cat << 'EOF' > WurmMapGen.properties
-          serverName=[QC/FR/CAN] QBC Doriath
-          wurmMapLocation=.
-          saveLocation=./output_tiles
-          dbDir=./sqlite
-          zonesDb=wurmzones.db
-          itemsDb=wurmitems.db
-          playersDb=wurmplayers.db
-          actualMapSize=4096
-          mapTileSize=256
-          mapMaxZoom=5
-          mapMinZoom=0
-          nativeZoom=5
-          markerType=2
-          enableRealtimeMarkers=true
-          usePHP=false
-          rmiHost=${{ secrets.LEGION_HOST }}
-          rmiPort=5606
-          rmiPassword=${{ secrets.RMI_PASSWORD }}
-          EOF
-
-          mkdir -p output_tiles/images output_tiles/data
-          mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
-          
-          cat << 'EOF' > template/index.html
-          <!DOCTYPE html><html><head><title>WurmMapGen</title></head><body></body></html>
-          EOF
-          
-          chmod +x WurmMapGen.jar
-          java -Djava.awt.headless=true -jar WurmMapGen.jar
-      - name: 5. Creation du Pack Web Autonome Immediat
-        run: |
-          mkdir -p /tmp/site_propre/images /tmp/site_propre/data
-          
-          # Extraction et copie des tuiles (zoom maximal ou racine)
-          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
-          cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
-          cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
-
-          # 🧪 RAPPORT : diagnostic.txt
-          echo "=== RAPPORT DE DIAGNOSTIC LIVE MAP QBC ===" > /tmp/site_propre/diagnostic.txt
-          echo "Date d'execution : $(date)" >> /tmp/site_propre/diagnostic.txt
-          echo "Nombre total de tuiles PNG generees : $(ls -1 /tmp/site_propre/images/*.png 2>/dev/null | wc -l)" >> /tmp/site_propre/diagnostic.txt
-          echo "Presence du fichier villages.json : $(if [ -f /tmp/site_propre/data/villages.json ]; then echo 'OUI ✔'; else echo 'NON ❌'; fi)" >> /tmp/site_propre/diagnostic.txt
-          echo "Taille totale du dossier d'images : $(du -sh /tmp/site_propre/images | cut -f1)" >> /tmp/site_propre/diagnostic.txt
-          echo "==========================================" >> /tmp/site_propre/diagnostic.txt
-
-          # ÉCRITURE DE L INDEX INTERACTIF ULTRA-STABLE (Bannit les scripts morts)
-          cat << 'EOF' > /tmp/site_propre/index.html
-          <!DOCTYPE html>
-          <html lang="fr">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-              <title>[QC/FR/CAN] QBC Doriath - LiveMap</title>
-              <link rel="stylesheet" href="https://unpkg.com" />
-              <script src="https://unpkg.com"></script>
-              <style>
-                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a24; font-family: sans-serif; }
-                  #sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 240px; background: #22222b; box-shadow: 2px 0 10px rgba(0,0,0,0.5); z-index: 100; padding: 15px; border-right: 1px solid #3a3a4a; color: white; overflow-y: auto; }
-                  #sidebar h1 { color: #2196F3; font-size: 16px; margin: 0 0 5px 0; font-weight: bold; }
-                  #sidebar p { color: #888; font-size: 11px; margin: 0 0 20px 0; }
-                  #map { position: absolute; top: 0; bottom: 0; right: 0; left: 240px; background-color: #15151c; z-index: 1; }
-                  .filter-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; }
-                  .filter-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; cursor: pointer; user-select: none; }
-              </style>
-          </head>
-          <body>
-              <div id="sidebar">
-                  <h1>QBC Doriath</h1>
-                  <p>Interactive LiveMap • Réseau stable 2026</p>
-                  <div style="font-size: 11px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px;">Contrôle de l'affichage</div>
-                  <div class="filter-group">
-                      <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Afficher les villages</label>
-                      <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Afficher les tours de garde</label>
-                  </div>
-              </div>
-              <div id="map"></div>
-              <script>
-                  window.addEventListener('load', function() {
-                      var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
-                      
-                      var bounds = new L.LatLngBounds(map.unproject([0, 0], 5), map.unproject([4096, 4096], 5));
-                      map.fitBounds(bounds);
-                      map.setZoom(2);
-                      
-                      L.tileLayer('images/{x}-{y}.png', { tileSize: 256, noWrap: true, tms: true }).addTo(map);
-                      var layers = { villages: L.layerGroup().addTo(map), towers: L.layerGroup().addTo(map) };
-                      
-                      window.toggleLayer = function(type) {
-                          var chk = document.getElementById('chk-' + type);
-                          if (chk.checked) { map.addLayer(layers[type]); } else { map.removeLayer(layers[type]); }
-                      };
-                      
-                      fetch('data/villages.json')
-                          .then(res => res.json())
-                          .then(data => {
-                              if(Array.isArray(data)) {
-                                  data.forEach(v => {
-                                      var marker = L.marker(map.unproject([v.x, v.y], 5));
-                                      marker.bindPopup(`<b>🏰 Village : ${v.name}</b><br>👤 Maire : ${v.mayor}`);
-                                      layers.villages.addLayer(marker);
-                                  });
-                              }
-                          }).catch(() => console.log("JSON chargé."));
-                  });
-              </script>
-          </body>
-          </html>
-          EOF
-
-      - name: 6. Ouverture securisee du Depot 1 via l Action Officielle
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          repository: 'LaTrouTe11/wurm-livemap-doriath'
-          token: ${{ secrets.MY_DEPLOY_TOKEN }}
-          path: 'espace_depot1'
+          fetch-depth: 0
 
-      - name: 7. Nettoyage et Envoi Épuré
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Création des structures de dossiers requises
+      - name: Create local directories
+        run: mkdir -p sqlite_db/sqlite
+
+      # Téléchargement automatique de la liste complète des fichiers requis
+      - name: Scan and Download Map Files via Node SFTP
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            const execSync = require('child_process').execSync;
+            execSync('npm install ssh2-sftp-client');
+            const Client = require('ssh2-sftp-client');
+            const sftp = new Client();
+            
+            const config = {
+              host: '${{ secrets.LEGION_HOST }}',
+              port: parseInt('${{ secrets.LEGION_PORT }}' || '22'),
+              username: '${{ secrets.LEGION_USER }}',
+              password: '${{ secrets.LEGION_PASS }}'
+            };
+            
+            async function findFile(dir, targetName) {
+              let list = await sftp.list(dir);
+              for (const item of list) {
+                const fullPath = dir === '/' ? `/${item.name}` : `${dir}/${item.name}`;
+                if (item.type === '-') {
+                  if (item.name.toLowerCase() === targetName.toLowerCase()) {
+                    return fullPath;
+                  }
+                } else if (item.type === 'd' && item.name !== '.' && item.name !== '..') {
+                  try {
+                    const found = await findFile(fullPath, targetName);
+                    if (found) return found;
+                  } catch (e) {}
+                }
+              }
+              return null;
+            }
+            
+            async function main() {
+              try {
+                console.log('Connexion à Legion Hosting...');
+                await sftp.connect(config);
+                
+                const mapPath = await findFile('.', 'top_layer.map');
+                if (mapPath) { await sftp.fastGet(mapPath, './sqlite_db/top_layer.map'); }
+                
+                const zonesPath = await findFile('.', 'wurmzones.db');
+                if (zonesPath) { await sftp.fastGet(zonesPath, './sqlite_db/sqlite/wurmzones.db'); }
+
+                const itemsPath = await findFile('.', 'wurmitems.db');
+                if (itemsPath) { await sftp.fastGet(itemsPath, './sqlite_db/sqlite/wurmitems.db'); }
+
+                const playersPath = await findFile('.', 'wurmplayers.db');
+                if (playersPath) { await sftp.fastGet(playersPath, './sqlite_db/sqlite/wurmplayers.db'); }
+                
+                console.log('Téléchargements réussis.');
+              } catch (err) {
+                console.error('Erreur critique:', err.message);
+                process.exit(1);
+              } finally {
+                await sftp.end();
+              }
+            }
+            
+            return main();
+
+      # Alignement structurel complet
+      - name: Align files structure
         run: |
-          # Suppression de l'ancienne arborescence défaillante pour anéantir la page blanche
-          rm -rf espace_depot1/* 2>/dev/null || true
-          mkdir -p espace_depot1/images espace_depot1/data
+          cp ./sqlite_db/top_layer.map ./sqlite_db/sqlite/top_layer.map
+          cp ./sqlite_db/sqlite/wurmzones.db ./sqlite_db/wurmzones.db
+          cp ./sqlite_db/sqlite/wurmitems.db ./sqlite_db/wurmitems.db
+          cp ./sqlite_db/sqlite/wurmplayers.db ./sqlite_db/wurmplayers.db
+          echo "Structure de données alignée."
+
+      # Compilation de la carte (Génère uniquement les tuiles d'images)
+      - name: Run WurmMapGen
+        run: |
+          java -jar WurmMapGen.jar || true
+
+      # Duplication brute et propre de votre template vers la racine
+      - name: Build Clean Index from Template
+        run: |
+          cp template/index.html ./index.html
+          echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
+
+      # CORRECTIF : Sauvegarde globale et sécurisée des images et de l'index sur votre historique GitHub
+      - name: Pousser les fichiers corriges sur GitHub
+        run: |
+          git config --local user.name "Doriath-Map-Bot"
+          git config --local user.email "actions@github.com"
           
-          # Copie des fichiers épurés
-          cp -rf /tmp/site_propre/* espace_depot1/
+          # Ajoute l'index, les fichiers de données des deeds et toutes les images du relief générées
+          git add index.html data/*.json images/*.png app/map.js
           
-          cd espace_depot1
-          git config user.name "Robot Coordinateur Wurm"
-          git config user.email "action@github.com"
-          git add .
-          git commit -m "Console QBC 2026 : Allumage de la carte sans page blanche" || echo "Déjà à jour"
-          git push origin main --force || git push origin master --force
+          # Effectue la sauvegarde uniquement s'il y a des changements réels détectés
+          if ! git diff-index --quiet HEAD --; then
+            git commit -m "Mise a jour automatique WurmMapGen v2.33 [skip ci]"
+            git push origin main
+            echo "Succès : L'index et les images ont été sauvegardés sur votre dépôt !"
+          else
+            echo "Aucune modification détectée."
+          fi
+
+      # Préparation de l'envoi vers le site web
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      # Déploiement final en ligne
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
 
 
