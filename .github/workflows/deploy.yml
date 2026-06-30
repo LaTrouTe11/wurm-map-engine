@@ -14,6 +14,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1. On ouvre le Dépôt 2 pour récupérer le générateur Java
       - name: 1. Checkout du Depot 2 (Générateur)
         uses: actions/checkout@v4
 
@@ -38,7 +39,7 @@ jobs:
       - name: 4. Execution du Generateur Java WurmMapGen
         run: |
           if [ -f "WurmMapGen.properties" ]; then
-            sed -i '/rmiPassword/d' >> WurmMapGen.properties
+            sed -i '/rmiPassword/d' WurmMapGen.properties
             sed -i 's/rmiHost=.*/rmiHost=${{ secrets.LEGION_HOST }}/g' WurmMapGen.properties
             sed -i 's/rmiPort=.*/rmiPort=5606/g' WurmMapGen.properties
             sed -i 's/enableRealtimeMarkers=.*/enableRealtimeMarkers=true/g' WurmMapGen.properties
@@ -59,7 +60,7 @@ jobs:
           find . -maxdepth 1 -name "*.png" -exec cp -f {} /tmp/site_propre/images/ \; 2>/dev/null || true
           find . -maxdepth 1 -name "*.json" -exec cp -f {} /tmp/site_propre/data/ \; 2>/dev/null || true
 
-          # Écriture de l'index d'affichage direct Leaflet sans trou CDN
+          # Écriture forcée de l'index sans aucun crochet vide pour Leaflet
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -81,7 +82,7 @@ jobs:
           <body>
               <div id="sidebar">
                   <h1>QBC Doriath</h1>
-                  <p>Interactive LiveMap • Console QBC 2026</p>
+                  <p>Interactive LiveMap • 2026</p>
                   <div style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; margin-bottom: 10px;">Calques</div>
                   <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Villages (Deeds)</label>
                   <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Tours de garde</label>
@@ -117,18 +118,28 @@ jobs:
           </html>
           EOF
 
-      - name: 6. Envoi Force Synchronise Multi-Branches (Main + Master)
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
+      # FIX DE SÉCURITÉ ABSOLU : On utilise l'action officielle GitHub pour ouvrir le Dépôt 1 avec ton jeton classique
+      - name: 6. Ouverture securisee du Depot 1 (Site Web)
+        uses: actions/checkout@v4
         with:
-          source-directory: '/tmp/site_propre'
-          destination-repository-username: 'latroute11'
-          destination-repository-name: 'wurm-livemap-doriath'
-          target-branch: 'main'
-          create-target-branch-if-needed: true
-          user-email: 'action@github.com'
-          user-name: 'Robot Coordinateur Wurm'
-          commit-message: 'Console QBC 2026 : Allumage et synchronisation de la carte'
+          repository: 'latroute11/wurm-livemap-doriath'
+          token: ${{ secrets.MY_DEPLOY_TOKEN }}
+          path: 'espace_depot1'
+
+      # DEPLOIEMENT NATIF SANS ERREUR 403
+      - name: 7. Transfert et Commit obligatoire
+        run: |
+          # 1. Copie des fichiers propres générés vers l'espace sécurisé du Dépôt 1
+          mkdir -p espace_depot1/images espace_depot1/data
+          cp -rf /tmp/site_propre/* espace_depot1/
+          
+          # 2. Envoi vers GitHub via l'authentification native vérifiée
+          cd espace_depot1
+          git config user.name "Robot Coordinateur Wurm"
+          git config user.email "action@github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "Console QBC 2026 : synchronisation reussie"
+          git push origin main || git push origin master
+
 
 
