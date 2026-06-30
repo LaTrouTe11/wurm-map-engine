@@ -33,7 +33,7 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Generation des 256 Images du Terrain
+      - name: 4. Generation de la structure complete par le JAR
         run: |
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
@@ -56,93 +56,59 @@ jobs:
           rmiPassword=${{ secrets.RMI_PASSWORD }}
           EOF
 
-          # Création de la structure complète pour forcer Java à tout écrire de manière visible
+          # Création préalable de la structure requise pour l'écriture Java
           mkdir -p output_tiles/images output_tiles/data
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Creation du Pack Web Propre Complet 2026 Visible
+      - name: 5. Assemblage du Site Complet Original Francisé
         run: |
-          # Création de l'arborescence complète qui sera envoyée sur le Dépôt 1
-          mkdir -p /tmp/site_propre/images /tmp/site_propre/data /tmp/site_propre/app /tmp/site_propre/css /tmp/site_propre/markers /tmp/site_propre/dist /tmp/site_propre/includes
+          # 1. Création de la zone d'assemblage temporaire
+          mkdir -p /tmp/site_complet
           
-          # Copie de absolument tous les dossiers de l'application Wurm pour les rendre visibles
+          # 2. COPIE INTÉGRALE de toute l'arborescence générée par le programme original dans le template
           if [ -d "template" ]; then
-            cp -rf template/* /tmp/site_propre/ 2>/dev/null || true
+            cp -rf template/* /tmp/site_complet/
           fi
           
-          # Rapatriement forcé des tuiles PNG générées dans le dossier visible principal
-          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
-          cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
-          cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
+          # 3. Injection forcée des dalles PNG et JSON générées par sécurité
+          mkdir -p /tmp/site_complet/images /tmp/site_complet/data
+          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_complet/data/ 2>/dev/null || true; fi
+          cp -f *.png /tmp/site_complet/images/ 2>/dev/null || true
+          cp -f *.json /tmp/site_complet/data/ 2>/dev/null || true
 
-          # Écriture de l'index d'affichage Leaflet stabilisé et francisé
-          cat << 'EOF' > /tmp/site_propre/index.html
-          <!DOCTYPE html>
-          <html lang="fr">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-              <title>[QC/FR/CAN] QBC Doriath - LiveMap</title>
-              <link rel="stylesheet" href="https://unpkg.com" />
-              <script src="https://unpkg.com"></script>
-              <style>
-                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a24; font-family: sans-serif; }
-                  #sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 240px; background: #22222b; box-shadow: 2px 0 10px rgba(0,0,0,0.5); z-index: 100; padding: 15px; border-right: 1px solid #3a3a4a; color: white; overflow-y: auto; }
-                  #sidebar h1 { color: #2196F3; font-size: 16px; margin: 0 0 5px 0; font-weight: bold; }
-                  #sidebar p { color: #888; font-size: 11px; margin: 0 0 20px 0; }
-                  #map { position: absolute; top: 0; bottom: 0; right: 0; left: 240px; background-color: #15151c; z-index: 1; }
-                  .filter-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; }
-                  .filter-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; cursor: pointer; user-select: none; }
-              </style>
-          </head>
-          <body>
-              <div id="sidebar">
-                  <h1>QBC Doriath</h1>
-                  <p>Interactive LiveMap • Réseau stable 2026</p>
-                  <div style="font-size: 11px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px;">Contrôle de l'affichage</div>
-                  <div class="filter-group">
-                      <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Afficher les villages</label>
-                      <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Afficher les tours de garde</label>
-                  </div>
-              </div>
-              <div id="map"></div>
-              <script>
-                  window.addEventListener('load', function() {
-                      var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
-                      
-                      var p1 = map.unproject([0, 0], 5);
-                      var p2 = map.unproject([4096, 4096], 5);
-                      var bounds = new L.LatLngBounds(p1, p2);
-                      map.fitBounds(bounds);
-                      map.setZoom(2);
-                      
-                      L.tileLayer('images/{x}-{y}.png', { tileSize: 256, noWrap: true, tms: true }).addTo(map);
-                      var layers = { villages: L.layerGroup().addTo(map), towers: L.layerGroup().addTo(map) };
-                      
-                      window.toggleLayer = function(type) {
-                          var chk = document.getElementById('chk-' + type);
-                          if (chk.checked) { map.addLayer(layers[type]); } else { map.removeLayer(layers[type]); }
-                      };
-                      
-                      fetch('data/villages.json')
-                          .then(res => res.json())
-                          .then(data => {
-                              data.forEach(v => {
-                                  var marker = L.marker(map.unproject([v.x, v.y], 5));
-                                  marker.bindPopup(`<b>🏰 Village : ${v.name}</b><br>👤 Maire : ${v.mayor}`);
-                                  layers.villages.addLayer(marker);
-                              });
-                          }).catch(() => console.log("JSON chargé."));
-                  });
-              </script>
-          </body>
-          </html>
+          # 4. FIX LINUX EN DUR DU SCRIPT MAIN.JS (Répare le crash TypeError actualMapSize de la ligne 68)
+          # On injecte la configuration JSON attendue directement là où main.js va la lire
+          cat << 'EOF' > /tmp/site_complet/data/config.json
+          {
+            "serverName": "[QC/FR/CAN] QBC Doriath",
+            "actualMapSize": 4096,
+            "mapTileSize": 256,
+            "mapMaxZoom": 5,
+            "mapMinZoom": 0,
+            "nativeZoom": 5,
+            "markerType": 2,
+            "enableRealtimeMarkers": true,
+            "showPlayers": true,
+            "showDeeds": true,
+            "showGuardTowers": true,
+            "showPortals": true,
+            "showStructures": true
+          }
           EOF
+
+          # 5. Traduction et correction de secours du fichier index.html d'origine pour Leaflet
+          if [ -f "/tmp/site_complet/index.html" ]; then
+            sed -i 's/map.unproject(\[,\s*\]/map.unproject(\[0,0\]/g' /tmp/site_complet/index.html 2>/dev/null || true
+            sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' /tmp/site_complet/index.html 2>/dev/null || true
+            sed -i 's/Show deeds/Afficher les villages/g' /tmp/site_complet/index.html 2>/dev/null || true
+            sed -i 's/Show guard towers/Afficher les tours de garde/g' /tmp/site_complet/index.html 2>/dev/null || true
+            sed -i 's/Show players/Afficher les joueurs/g' /tmp/site_complet/index.html 2>/dev/null || true
+          fi
 
       - name: 6. Ouverture automatique du Depot 1 via Action Officielle
         uses: actions/checkout@v4
@@ -151,20 +117,21 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Transfert et Envoi de l Arborescence Complete
+      - name: 7. Deploiement de l'Arborescence Root Absolute vers Depot 1
         run: |
-          # On s'assure que tous les dossiers de réception existent sur le site web
+          # On s'assure de créer tous les répertoires d'infrastructure d'origine
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Transfert global de toute la structure
-          cp -rf /tmp/site_propre/* espace_depot1/
+          # Copie miroir absolue de toutes les pièces du puzzle d'origine
+          cp -rf /tmp/site_complet/* espace_depot1/
           
           cd espace_depot1
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
-          git add .
-          git commit -m "Console QBC 2026 : Affichage de l arborescence complete des dossiers" || echo "Déjà à jour"
+          git add -A .
+          git commit -m "Console QBC 2026 : Deploiement miroir complet avec correction config.json" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
