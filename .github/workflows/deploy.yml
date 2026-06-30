@@ -15,22 +15,24 @@ jobs:
 
       - name: Download Data via FTP
         run: |
-          sudo apt-get install lftp
-          lftp -c "set ftp:ssl-allow no; open -u ${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }} -p ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_HOST }}; get wurmplayers.db; get wurm.db; exit"
+          sudo apt-get update
+          sudo apt-get install -y lftp
+          # Utilisation de mget et timeout pour éviter le blocage
+          lftp -c "set ftp:ssl-allow no; set net:timeout 10; set net:max-retries 1; open -u ${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }} -p ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_HOST }}; mget wurmplayers.db wurm.db; quit"
 
       - name: Generate Map
         run: |
           java -jar WurmMapGen.jar
 
       - name: Clone Site Web
-        # C'est ici que la modification a été faite pour utiliser le jeton
         run: |
           git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
 
       - name: Copy Maps to Site
         run: |
+          # On copie le contenu généré vers le dossier du site cloné
+          # Assurez-vous que le dossier 'tiles' existe bien après l'étape Generate Map
           cp -r tiles/* wurm-livemap-doriath/tiles/
-          # Ajoutez ici d'autres commandes de copie si nécessaire
 
       - name: Push to Site Web
         run: |
