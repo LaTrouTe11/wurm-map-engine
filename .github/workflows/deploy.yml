@@ -15,10 +15,11 @@ jobs:
 
       - name: Download Data via SFTP
         run: |
+          # Installation des outils nécessaires
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion SFTP, accès au dossier du monde, et téléchargement
+          # Connexion SFTP directe, accès au dossier du monde, et téléchargement
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
           cd /dist/Doriath-4k-20
           get wurmplayers.db
@@ -36,6 +37,7 @@ jobs:
 
       - name: Copy Maps to Site
         run: |
+          # On copie le contenu généré vers le dossier du site cloné
           cp -r tiles/* wurm-livemap-doriath/tiles/
 
       - name: Push to Site Web
