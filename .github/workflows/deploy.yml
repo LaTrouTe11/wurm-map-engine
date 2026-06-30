@@ -28,7 +28,7 @@ jobs:
           lftp -c "set sftp:auto-confirm yes; \
                    set ssl:verify-certificate no; \
                    set xfer:clobber on; \
-                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} ; \
+                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }}; \
                    cd /dist/Doriath-4k-20/sqlite/; \
                    mget -O ./sqlite/ wurmzones.db wurmitems.db wurmplayers.db; \
                    cd ../; \
@@ -45,33 +45,37 @@ jobs:
             echo "rmiPassword=${{ secrets.RMI_PASSWORD }}" >> WurmMapGen.properties
           fi
 
+          # Création de la structure pour recevoir les rendus Java
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
-      - name: 5. Synchronisation Directe par API (Sans Git Clone)
+      - name: 5. Synchronisation Directe des Images par API
         uses: cpina/github-action-push-to-another-repository@main
         env:
           API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
         with:
-          source-directory: 'images'
+          # FIX : On cible le dossier exact où Java extrait les images du terrain
+          source-directory: 'template/images'
           destination-repository-username: 'latroute11'
           destination-repository-name: 'wurm-livemap-doriath'
           target-branch: 'main'
           target-directory: 'images'
           user-email: 'action@github.com'
           user-name: 'Robot Coordinateur Wurm'
-          commit-message: 'MAJ auto : synchronisation des tuiles de terrain'
+          commit-message: 'MAJ auto : synchronisation des tuiles de terrain depuis le generateur'
 
       - name: 6. Synchronisation des Donnees JSON par API
         uses: cpina/github-action-push-to-another-repository@main
         env:
           API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
         with:
-          source-directory: 'data'
+          # FIX : On cible le dossier exact où Java écrit les fichiers de marqueurs
+          source-directory: 'template/data'
           destination-repository-username: 'latroute11'
           destination-repository-name: 'wurm-livemap-doriath'
           target-branch: 'main'
           target-directory: 'data'
           user-email: 'action@github.com'
           user-name: 'Robot Coordinateur Wurm'
-          commit-message: 'MAJ auto : synchronisation des marqueurs JSON'
+          commit-message: 'MAJ auto : synchronisation des marqueurs JSON depuis le generateur'
+
