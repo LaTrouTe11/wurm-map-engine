@@ -1,4 +1,3 @@
-
 name: Generateur et Liaison Inter-Depots
 
 on:
@@ -29,7 +28,7 @@ jobs:
           lftp -c "set sftp:auto-confirm yes; \
                    set ssl:verify-certificate no; \
                    set xfer:clobber on; \
-                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }}; \
+                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} ; \
                    cd /dist/Doriath-4k-20/sqlite/; \
                    mget -O ./sqlite/ wurmzones.db wurmitems.db wurmplayers.db; \
                    cd ../; \
@@ -49,23 +48,30 @@ jobs:
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
-      - name: 5. Connexion Securisee et Push vers le Depot 1 (Site Web)
-        run: |
-          git config --global user.name "Robot Coordinateur Wurm"
-          git config --global user.email "action@github.com"
-          
-          # FIX DÉFINITIF DE SÉCURITÉ : Utilisation de l'authentification par jeton encodé sans injection directe dans l'URL
-          git config --global http.https://github.com "Authorization: basic $(echo -n x:${{ secrets.MY_DEPLOY_TOKEN }} | base64)"
-          
-          # Clonage propre avec URL standard
-          git clone https://github.com /tmp/depot_web
-          
-          mkdir -p /tmp/depot_web/images /tmp/depot_web/data
-          if [ -d "images" ]; then cp -rf images/*.png /tmp/depot_web/images/ 2>/dev/null || true; fi
-          if [ -d "data" ]; then cp -rf data/*.json /tmp/depot_web/data/ 2>/dev/null || true; fi
-          
-          cd /tmp/depot_web
-          git add images/ data/
-          git diff-index --quiet HEAD || git commit -m "MAJ auto : synchronisation des donnees depuis le depot generateur"
-          git push origin main || true
-          rm -rf /tmp/depot_web
+      - name: 5. Synchronisation Directe par API (Sans Git Clone)
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
+        with:
+          source-directory: 'images'
+          destination-repository-username: 'latroute11'
+          destination-repository-name: 'wurm-livemap-doriath'
+          target-branch: 'main'
+          target-directory: 'images'
+          user-email: 'action@github.com'
+          user-name: 'Robot Coordinateur Wurm'
+          commit-message: 'MAJ auto : synchronisation des tuiles de terrain'
+
+      - name: 6. Synchronisation des Donnees JSON par API
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
+        with:
+          source-directory: 'data'
+          destination-repository-username: 'latroute11'
+          destination-repository-name: 'wurm-livemap-doriath'
+          target-branch: 'main'
+          target-directory: 'data'
+          user-email: 'action@github.com'
+          user-name: 'Robot Coordinateur Wurm'
+          commit-message: 'MAJ auto : synchronisation des marqueurs JSON'
