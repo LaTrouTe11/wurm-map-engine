@@ -18,9 +18,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion SFTP, liste le contenu pour localiser les fichiers, puis télécharge
+          # Connexion SFTP, accès au dossier du monde, et téléchargement
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          ls -l
+          cd /dist/Doriath-4k-20
           get wurmplayers.db
           get wurm.db
           bye
