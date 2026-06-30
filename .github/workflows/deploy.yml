@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # MODIFIEZ CECI AVEC LE NOM EXACT DE VOTRE MONDE
+      NOM_MONDE: "Doriath-4k-20"
     steps:
       - name: Checkout Engine
         uses: actions/checkout@v4
@@ -18,9 +21,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion SFTP, accès au dossier sqlite, et téléchargement
+          # Connexion et recherche dynamique du dossier par le nom du monde
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          cd /home/container/dist/Doriath-4k-20/sqlite
+          # On cherche le répertoire qui contient le nom de votre monde
+          cd $(find /home/container -type d -name "$NOM_MONDE" | head -n 1)/sqlite
+          
+          # Téléchargement des bases de données
           get wurmplayers.db
           get wurm.db
           bye
