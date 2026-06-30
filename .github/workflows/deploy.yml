@@ -37,7 +37,6 @@ jobs:
 
       - name: 4. Execution du Generateur Java WurmMapGen
         run: |
-          # 1. Injection propre de la configuration properties
           if [ -f "WurmMapGen.properties" ]; then
             sed -i '/rmiPassword/d' WurmMapGen.properties
             sed -i 's/rmiHost=.*/rmiHost=${{ secrets.LEGION_HOST }}/g' WurmMapGen.properties
@@ -46,35 +45,26 @@ jobs:
             echo "rmiPassword=${{ secrets.RMI_PASSWORD }}" >> WurmMapGen.properties
           fi
 
-          # 2. Arborescence temporaire requise par l'outil Java
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
-          
-          # 3. Exécution brute du rendu cartographique
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
       - name: 5. Connexion Securisee et Push vers le Depot 1 (Site Web)
+        env:
+          CLE_SECRET: ${{ secrets.MY_DEPLOY_TOKEN }}
         run: |
-          # 1. Configuration de l'identité Git globale du robot
           git config --global user.name "Robot Coordinateur Wurm"
           git config --global user.email "action@github.com"
           
-          # 2. CORRECTION DE LIEN : Utilise votre clé secrète MY_DEPLOY_TOKEN pour cloner le Dépôt 1
-          # ATTENTION : Changez bien "wurm-livemap-doriath.git" par le nom exact de votre Dépôt 1 si différent !
-          git clone https://${{ secrets.MY_DEPLOY_TOKEN }}@://github.com /tmp/depot_web
+          # FIX: Utilisation d'une variable d'environnement pour bloquer les coupures de l'IA sur l'URL
+          git clone "https://${CLE_SECRET}@://github.com" /tmp/depot_web
           
-          # 3. Création des dossiers de réception sur le dépôt d'affichage
           mkdir -p /tmp/depot_web/images /tmp/depot_web/data
-          
-          # 4. Rapatriement et transfert des nouvelles tuiles et paquets JSON générés
           if [ -d "images" ]; then cp -rf images/*.png /tmp/depot_web/images/ 2>/dev/null || true; fi
           if [ -d "data" ]; then cp -rf data/*.json /tmp/depot_web/data/ 2>/dev/null || true; fi
           
-          # 5. Déplacement dans l'espace de stockage du site web et envoi en direct
           cd /tmp/depot_web
           git add images/ data/
           git diff-index --quiet HEAD || git commit -m "MAJ auto : synchronisation des donnees depuis le depot generateur"
           git push origin main || true
-          
-          # 6. Nettoyage complet de sécurité
           rm -rf /tmp/depot_web
 
