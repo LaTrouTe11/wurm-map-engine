@@ -57,30 +57,19 @@ jobs:
           EOF
 
           mkdir -p output_tiles/images output_tiles/data
-          mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
-          
-          cat << 'EOF' > template/index.html
-          <!DOCTYPE html>
-          <html><head><title>WurmMapGen</title></head><body></body></html>
-          EOF
-          
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Téléchargement et Reconstruction de l Arborescence Officielle
+      - name: 5. Assemblage Local Absolu Depuis votre Template
         run: |
           mkdir -p /tmp/site_complet
           
-          # TÉLÉCHARGEMENT DIRECT : Récupération des dossiers systèmes officiels depuis le dépôt source officiel de l'outil
-          git clone --depth=1 https://github.com /tmp/wurm_source
-          
-          # Copie de l'intégralité de l'interface web officielle (app, css, markers, dist, includes)
-          if [ -d "/tmp/wurm_source/template" ]; then
-            cp -rf /tmp/wurm_source/template/* /tmp/site_complet/
+          # Le robot copie tout votre dossier template local
+          if [ -d "template" ]; then
+            cp -rf template/* /tmp/site_complet/
           fi
-          rm -rf /tmp/wurm_source
-
-          # Injection et fusion forcée des dalles PNG et JSON générées pour Doriath
+          
+          # Fusion forcée des tuiles PNG de zoom maximal 5 calculées pour Doriath
           mkdir -p /tmp/site_complet/images /tmp/site_complet/data
           if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
@@ -88,7 +77,7 @@ jobs:
           cp -f *.png /tmp/site_complet/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_complet/data/ 2>/dev/null || true
 
-          # FIX DE LA LIGNE 68 : Écriture forcée du fichier config.json requis par main.js
+          # FIX DÉFINITIF LIGNE 68 : config.json écrit de force pour main.js
           cat << 'EOF' > /tmp/site_complet/data/config.json
           {
             "serverName": "[QC/FR/CAN] QBC Doriath",
@@ -107,21 +96,23 @@ jobs:
           }
           EOF
 
-      - name: 6. Ouverture automatique du Depot 1 via Action Officielle
+      - name: 6. Ouverture securisee du Depot 1 via l Action Officielle
         uses: actions/checkout@v4
         with:
           repository: 'LaTrouTe11/wurm-livemap-doriath'
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Deploiement de l Arborescence Miroir Totale vers Depot 1
+      - name: 7. Purge Miroir et Envoi vers le Depot 1
         run: |
+          # Purge complète du dépôt cible pour installer la structure miroir
+          rm -rf espace_depot1/* 2>/dev/null || true
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Copie miroir complète de l'interface officielle fusionnée
+          # Copie de tout le pack assemblé
           cp -rf /tmp/site_complet/* espace_depot1/
           
-          # Francisation automatique du fichier HTML d'origine pour éliminer les accolades
+          # Traduction rapide du panneau d'affichage original
           if [ -f "espace_depot1/index.html" ]; then
             sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' espace_depot1/index.html 2>/dev/null || true
             sed -i 's/Show deeds/Afficher les villages/g' espace_depot1/index.html 2>/dev/null || true
@@ -133,8 +124,9 @@ jobs:
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add -A .
-          git commit -m "Console QBC 2026 : Force push de l'arborescence officielle complète" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Allumage total depuis le template local" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
