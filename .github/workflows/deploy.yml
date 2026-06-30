@@ -1,9 +1,9 @@
+
 name: Deploy Wurm Map
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -24,36 +24,36 @@ jobs:
       - name: 3. Telechargement
         run: |
           mkdir -p WurmGenMap/sqlite
-          lftp -u "${{ secrets.LEGION_USER }},${{ secrets.LEGION_PASS }}" sftp://${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }} <<EOF
-          set sftp:auto-confirm yes
-          set ssl:verify-certificate no
-          set xfer:clobber on
-          # On essaie d'abord le chemin absolu complet, sinon le chemin relatif
-          cd /home/container/dist/Doriath-4k-20/sqlite/ || cd dist/Doriath-4k-20/sqlite/
-          mget -O WurmGenMap/sqlite/ wurmplayers.db wurm.db
-          # Téléchargement du fichier de mapping (on remonte d'un dossier)
-          cd ../
-          get -O WurmGenMap/ top_layer.map
-          bye
-          EOF
+          lftp -c "set sftp:auto-confirm yes; \
+                   set ssl:verify-certificate no; \
+                   set xfer:clobber on; \
+                   open sftp://${{ secrets.LEGION_USER }}:${{ secrets.LEGION_PASS }}@${{ secrets.LEGION_HOST }}:${{ secrets.LEGION_PORT }}; \
+                   cd /home/container/dist/Doriath-4k-20/sqlite/ || cd dist/Doriath-4k-20/sqlite/; \
+                   mget -O WurmGenMap/sqlite/ wurmplayers.db wurm.db; \
+                   cd ../; \
+                   get -O WurmGenMap/ top_layer.map; \
+                   bye"
 
       - name: 4. Generation
         run: |
-          # Copie de la config et lancement du générateur
+          # 1. Copie du fichier de config à la racine pour le programme
           cp WurmGenMap/WurmMapGen.properties .
+          
+          # 2. Lancement du générateur
           java -Djava.awt.headless=true -Xmx5g -jar WurmGenMap/WurmMapGen.jar
           
-          # Préparation des tuiles
+          # 3. Déplacement des tuiles vers template/tiles
           mkdir -p template/tiles
           find . -maxdepth 1 \( -name "*.png" -o -name "*.json" \) -exec mv {} template/tiles/ \; || echo "Aucune tuile"
           
-          # Copie de la config générée si présente
+          # 4. Copie de la config générée (pour le bug TypeError)
           if [ -f config.json ]; then
             cp config.json template/data/config.json
           fi
           
-          # Nettoyage
-          rm -f WurmMapGen.properties top_layer.map
+          # 5. Nettoyage
+          rm -f WurmMapGen.properties
+          rm -f top_layer.map
 
       - name: 5. Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
