@@ -52,14 +52,12 @@ jobs:
         run: |
           mkdir -p /tmp/site_propre/images /tmp/site_propre/data
           
-          # Extraction et rassemblement de toutes les tuiles et marqueurs JSON générés
           if [ -d "template/images" ]; then cp -rf template/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "template/data" ]; then cp -rf template/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
           
           find . -maxdepth 1 -name "*.png" -exec cp -f {} /tmp/site_propre/images/ \; 2>/dev/null || true
           find . -maxdepth 1 -name "*.json" -exec cp -f {} /tmp/site_propre/data/ \; 2>/dev/null || true
 
-          # Écriture de l'index d'affichage direct Leaflet sans trou CDN
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -117,25 +115,26 @@ jobs:
           </html>
           EOF
 
-      - name: 6. Connexion Git Native et Push Sécurisé via ghp_
-        env:
-          TOKEN_SECURE: ${{ secrets.MY_DEPLOY_TOKEN }}
+      - name: 6. Connexion Git Native et Extraheader Obligatoire
         run: |
           git config --global user.name "Robot Coordinateur Wurm"
           git config --global user.email "action@github.com"
           
-          # Clonage sécurisé intégrant le Token classique tout frais de votre compte
-          git clone "https://${TOKEN_SECURE}@://github.com" /tmp/sync_depot1
+          # FIX DÉFINITIF : Authentification via injection d'en-tête globale HTTP (Bannit l'erreur No Host)
+          git config --global http.https://github.com "Authorization: basic $(echo -n x:${{ secrets.MY_DEPLOY_TOKEN }} | base64)"
           
-          # Transfert des fichiers propres
+          # Clonage via l'adresse URL publique standard épurée
+          git clone https://github.com /tmp/sync_depot1
+          
+          # Transfert et copie des nouveaux paquets
           mkdir -p /tmp/sync_depot1/images /tmp/sync_depot1/data
           cp -rf /tmp/site_propre/* /tmp/sync_depot1/
           
-          # Push de force vers la branche principale avec l'URL authentifiée
+          # Push sécurisé
           cd /tmp/sync_depot1
           git add .
-          git diff-index --quiet HEAD || git commit -m "Console QBC 2026 : synchronisation reussie"
-          git push "https://${TOKEN_SECURE}@://github.com" main --force
+          git diff-index --quiet HEAD || git commit -m "Console QBC 2026 : synchronisation reussie par extraheader"
+          git push origin main --force || git push origin master --force
 
 
 
