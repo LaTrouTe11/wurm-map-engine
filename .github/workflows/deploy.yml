@@ -33,35 +33,54 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Configuration et Execution Forcee de WurmMapGen
+      - name: 4. Generation des 256 Images du Terrain
         run: |
-          if [ -f "WurmMapGen.properties" ]; then
-            sed -i '/rmiPassword/d' WurmMapGen.properties
-            sed -i 's/rmiHost=.*/rmiHost=${{ secrets.LEGION_HOST }}/g' WurmMapGen.properties
-            sed -i 's/rmiPort=.*/rmiPort=5606/g' WurmMapGen.properties
-            sed -i 's/enableRealtimeMarkers=.*/enableRealtimeMarkers=true/g' WurmMapGen.properties
-            echo "rmiPassword=${{ secrets.RMI_PASSWORD }}" >> WurmMapGen.properties
-          fi
+          # 1. ÉCRITURE FORCÉE DE LA CONFIGURATION EN DUR POUR LE JAR
+          cat << 'EOF' > WurmMapGen.properties
+          serverName=[QC/FR/CAN] QBC Doriath
+          wurmMapLocation=.
+          saveLocation=./output_tiles
+          dbDir=./sqlite
+          zonesDb=wurmzones.db
+          itemsDb=wurmitems.db
+          playersDb=wurmplayers.db
+          actualMapSize=4096
+          mapTileSize=256
+          mapMaxZoom=5
+          mapMinZoom=0
+          nativeZoom=5
+          markerType=2
+          enableRealtimeMarkers=true
+          usePHP=false
+          rmiHost=${{ secrets.LEGION_HOST }}
+          rmiPort=5606
+          rmiPassword=${{ secrets.RMI_PASSWORD }}
+          EOF
 
-          mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
+          # 2. Création des dossiers de travail requis
+          mkdir -p output_tiles/images output_tiles/data
+          
+          # 3. Droits d exécution
           chmod +x WurmMapGen.jar
-          chmod -R 777 template/
+          
+          # 4. Lancement forcé du générateur Java
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
       - name: 5. Creation du Pack Web Propre Complet 2026
         run: |
           mkdir -p /tmp/site_propre/images /tmp/site_propre/data
           
-          # Extraction et copie des paquets de tuiles PNG et JSON
-          if [ -d "template/images/5" ]; then
-            cp -rf template/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true
+          # Extraction et copie des tuiles depuis le nouveau dossier de sauvegarde propre
+          if [ -d "output_tiles/images/5" ]; then
+            cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true
           fi
+          cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true
+          cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true
           cp -rf template/images/*.png /tmp/site_propre/images/ 2>/dev/null || true
-          cp -rf template/data/*.json /tmp/site_propre/data/ 2>/dev/null || true
           cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
 
-          # Écriture de l index HTML stabilisé (Élimine définitivement les balises accolades orphelines)
+          # Fabrication de l index HTML stabilisé sans aucun espace vide (Protection IA)
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -79,25 +98,16 @@ jobs:
                   #map { position: absolute; top: 0; bottom: 0; right: 0; left: 240px; background-color: #15151c; z-index: 1; }
                   .filter-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 15px; }
                   .filter-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; cursor: pointer; user-select: none; }
-                  .filter-item input { cursor: pointer; }
-                  .indent { padding-left: 20px; color: #aaa; font-size: 12px; }
               </style>
           </head>
           <body>
               <div id="sidebar">
                   <h1>QBC Doriath</h1>
                   <p>Interactive LiveMap • Réseau stable 2026</p>
-                  
                   <div style="font-size: 11px; text-transform: uppercase; color: #555; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px;">Contrôle de l'affichage</div>
-                  
                   <div class="filter-group">
-                      <label class="filter-item"><input type="checkbox" id="chk-players" checked onchange="toggleLayer('players')"> Afficher les joueurs</label>
                       <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Afficher les villages</label>
-                      <label class="filter-item indent"><input type="checkbox" id="chk-villageBorders" checked onchange="toggleLayer('villageBorders')"> Frontières des villages</label>
                       <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Afficher les tours de garde</label>
-                      <label class="filter-item indent"><input type="checkbox" id="chk-towerBorders" checked onchange="toggleLayer('towerBorders')"> Zone d'influence des tours</label>
-                      <label class="filter-item"><input type="checkbox" id="chk-structures" checked onchange="toggleLayer('structures')"> Afficher les structures</label>
-                      <label class="filter-item"><input type="checkbox" id="chk-portals" checked onchange="toggleLayer('portals')"> Afficher les portails</label>
                   </div>
               </div>
               <div id="map"></div>
@@ -105,22 +115,15 @@ jobs:
                   window.addEventListener('load', function() {
                       var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
                       
-                      // Fixations dynamiques injectées par les commandes sed de l étape 5
-                      var bounds = new L.LatLngBounds(map.unproject(FIX_DIM_ZERO, 5), map.unproject(FIX_DIM_MAX, 5));
+                      // Fixation géométrique forcée : 0, 0 à 4096, 4096
+                      var p1 = map.unproject([0, 0], 5);
+                      var p2 = map.unproject([4096, 4096], 5);
+                      var bounds = new L.LatLngBounds(p1, p2);
                       map.fitBounds(bounds);
                       map.setZoom(2);
                       
                       L.tileLayer('images/{x}-{y}.png', { tileSize: 256, noWrap: true, tms: true }).addTo(map);
-                      
-                      var layers = {
-                          players: L.layerGroup().addTo(map),
-                          villages: L.layerGroup().addTo(map),
-                          villageBorders: L.layerGroup().addTo(map),
-                          towers: L.layerGroup().addTo(map),
-                          towerBorders: L.layerGroup().addTo(map),
-                          structures: L.layerGroup().addTo(map),
-                          portals: L.layerGroup().addTo(map)
-                      };
+                      var layers = { villages: L.layerGroup().addTo(map), towers: L.layerGroup().addTo(map) };
                       
                       window.toggleLayer = function(type) {
                           var chk = document.getElementById('chk-' + type);
@@ -135,16 +138,12 @@ jobs:
                                   marker.bindPopup(`<b>🏰 Village : ${v.name}</b><br>👤 Maire : ${v.mayor}`);
                                   layers.villages.addLayer(marker);
                               });
-                          }).catch(() => console.log("Données synchronisées."));
+                          }).catch(() => console.log("JSON chargé."));
                   });
               </script>
           </body>
           </html>
           EOF
-
-          # Injection directe en dur pour bloquer les filtres d'IA
-          sed -i 's/FIX_DIM_ZERO/\[0, 0\]/g' /tmp/site_propre/index.html
-          sed -i 's/FIX_DIM_MAX/\[4096, 4096\]/g' /tmp/site_propre/index.html
 
       - name: 6. Ouverture automatique du Depot 1 via Action Officielle
         uses: actions/checkout@v4
@@ -162,7 +161,7 @@ jobs:
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add .
-          git commit -m "Console QBC 2026 : Allumage force avec en tete traduits" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Generation complete des 256 images" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
 
 
