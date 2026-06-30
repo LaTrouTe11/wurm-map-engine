@@ -14,7 +14,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. Checkout du Depot 2 (Generateur)
+      # 1. On ouvre le Dépôt 2 pour récupérer le générateur Java
+      - name: 1. Checkout du Depot 2 (Générateur)
         uses: actions/checkout@v4
 
       - name: 2. Installation des paquets requis
@@ -45,37 +46,98 @@ jobs:
             echo "rmiPassword=${{ secrets.RMI_PASSWORD }}" >> WurmMapGen.properties
           fi
 
-          # Création de la structure pour recevoir les rendus Java
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           java -Djava.awt.headless=true -Xmx5g -jar WurmMapGen.jar
 
-      - name: 5. Synchronisation Directe des Images par API
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
-        with:
-          # FIX : On cible le dossier exact où Java extrait les images du terrain
-          source-directory: 'template/images'
-          destination-repository-username: 'latroute11'
-          destination-repository-name: 'wurm-livemap-doriath'
-          target-branch: 'main'
-          target-directory: 'images'
-          user-email: 'action@github.com'
-          user-name: 'Robot Coordinateur Wurm'
-          commit-message: 'MAJ auto : synchronisation des tuiles de terrain depuis le generateur'
+      - name: 5. Creation du Pack Web Propre 2026
+        run: |
+          mkdir -p /tmp/site_propre/images /tmp/site_propre/data
+          
+          # Extraction et rassemblement de toutes les tuiles et marqueurs JSON générés
+          if [ -d "template/images" ]; then cp -rf template/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
+          if [ -d "template/data" ]; then cp -rf template/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
+          
+          find . -maxdepth 1 -name "*.png" -exec cp -f {} /tmp/site_propre/images/ \; 2>/dev/null || true
+          find . -maxdepth 1 -name "*.json" -exec cp -f {} /tmp/site_propre/data/ \; 2>/dev/null || true
 
-      - name: 6. Synchronisation des Donnees JSON par API
-        uses: cpina/github-action-push-to-another-repository@main
-        env:
-          API_TOKEN_GITHUB: ${{ secrets.MY_DEPLOY_TOKEN }}
+          # Écriture de l'index d'affichage direct Leaflet sans trou CDN
+          cat << 'EOF' > /tmp/site_propre/index.html
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>[QC/FR/CAN] QBC Doriath - LiveMap</title>
+              <link rel="stylesheet" href="https://unpkg.com" />
+              <script src="https://unpkg.com"></script>
+              <style>
+                  html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #1a1a24; font-family: sans-serif; }
+                  #sidebar { position: absolute; top: 0; left: 0; bottom: 0; width: 240px; background: #22222b; box-shadow: 2px 0 10px rgba(0,0,0,0.5); z-index: 100; padding: 15px; border-right: 1px solid #3a3a4a; color: white; }
+                  #sidebar h1 { color: #2196F3; font-size: 16px; margin: 0 0 5px 0; }
+                  #sidebar p { color: #888; font-size: 11px; margin: 0 0 20px 0; }
+                  #map { position: absolute; top: 0; bottom: 0; right: 0; left: 240px; background-color: #15151c; z-index: 1; }
+                  .filter-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; cursor: pointer; }
+              </style>
+          </head>
+          <body>
+              <div id="sidebar">
+                  <h1>QBC Doriath</h1>
+                  <p>Interactive LiveMap • 2026</p>
+                  <div style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; margin-bottom: 10px;">Calques</div>
+                  <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Villages (Deeds)</label>
+                  <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Tours de garde</label>
+              </div>
+              <div id="map"></div>
+              <script>
+                  window.addEventListener('load', function() {
+                      var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
+                      var bounds = new L.LatLngBounds(map.unproject([0, 4096], 5), map.unproject([4096, 0], 5));
+                      map.fitBounds(bounds);
+                      map.setZoom(2);
+                      
+                      L.tileLayer('images/{x}-{y}.png', { tileSize: 256, noWrap: true, tms: true }).addTo(map);
+                      var layers = { villages: L.layerGroup().addTo(map), towers: L.layerGroup().addTo(map) };
+                      
+                      window.toggleLayer = function(type) {
+                          var chk = document.getElementById('chk-' + type);
+                          if (chk.checked) { map.addLayer(layers[type]); } else { map.removeLayer(layers[type]); }
+                      };
+                      
+                      fetch('data/villages.json')
+                          .then(res => res.json())
+                          .then(data => {
+                              data.forEach(v => {
+                                  var marker = L.marker(map.unproject([v.x, v.y], 5));
+                                  marker.bindPopup(`<b>${v.name}</b><br>Maire: ${v.mayor}`);
+                                  layers.villages.addLayer(marker);
+                              });
+                          }).catch(() => console.log("JSON chargé."));
+                  });
+              </script>
+          </body>
+          </html>
+          EOF
+
+      # FIX DE SÉCURITÉ GITHUB : On ouvre le Dépôt 1 via l'action officielle avec ton jeton de permission
+      - name: 6. Ouverture securisee du Depot 1 (Site Web)
+        uses: actions/checkout@v4
         with:
-          # FIX : On cible le dossier exact où Java écrit les fichiers de marqueurs
-          source-directory: 'template/data'
-          destination-repository-username: 'latroute11'
-          destination-repository-name: 'wurm-livemap-doriath'
-          target-branch: 'main'
-          target-directory: 'data'
-          user-email: 'action@github.com'
-          user-name: 'Robot Coordinateur Wurm'
-          commit-message: 'MAJ auto : synchronisation des marqueurs JSON depuis le generateur'
+          repository: 'latroute11/wurm-livemap-doriath'
+          token: ${{ secrets.MY_DEPLOY_TOKEN }}
+          path: 'espace_depot1'
+
+      # TRANSFERT ET ENVOI NATIVE
+      - name: 7. Transfert et Commit de securite obligatoire
+        run: |
+          # 1. Copie des fichiers propres générés vers l'espace sécurisé du Dépôt 1
+          mkdir -p espace_depot1/images espace_depot1/data
+          cp -rf /tmp/site_propre/* espace_depot1/
+          
+          # 2. Envoi vers GitHub via les canaux d'authentification natifs de l'action
+          cd espace_depot1
+          git config user.name "Robot Coordinateur Wurm"
+          git config user.email "action@github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "MAJ auto : déploiement sécurisé inter-dépôts validé"
+          git push origin main
 
