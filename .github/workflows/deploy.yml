@@ -19,6 +19,7 @@ jobs:
   build-and-deploy:
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,11 +33,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Création des structures de dossiers requises
+      # 1. Création des structures de dossiers requises pour les bases SQLite
       - name: Create local directories
         run: mkdir -p sqlite_db/sqlite
 
-      # Téléchargement automatique de la liste complète des fichiers requis
+      # 2. Téléchargement automatique et scan sécurisé de la liste complète des fichiers requis
       - name: Scan and Download Map Files via Node SFTP
         uses: actions/github-script@v7
         with:
@@ -102,54 +103,57 @@ jobs:
             
             return main();
 
-      # Alignement structurel complet
+      # 3. Alignement structurel complet pour satisfaire l'outil Java
       - name: Align files structure
         run: |
           cp ./sqlite_db/top_layer.map ./sqlite_db/sqlite/top_layer.map
-          cp ./sqlite_db/sqlite/wurmzones.db ./sqlite_db/wurmzones.db
-          cp ./sqlite_db/sqlite/wurmitems.db ./sqlite_db/wurmitems.db
-          cp ./sqlite_db/sqlite/wurmplayers.db ./sqlite_db/wurmplayers.db
+          cp ./sqlite_db/sqlite/wurmzones.db ./wurmzones.db
+          cp ./sqlite_db/sqlite/wurmitems.db ./wurmitems.db
+          cp ./sqlite_db/sqlite/wurmplayers.db ./wurmplayers.db
           echo "Structure de données alignée."
 
-      # Compilation de la carte (Génère uniquement les tuiles d'images)
+      # 4. Compilation de la carte (Génère uniquement les tuiles d'images)
       - name: Run WurmMapGen
         run: |
           java -jar WurmMapGen.jar || true
 
-      # Duplication brute et propre de votre template vers la racine
+      # 5. Duplication brute et propre de votre template d'interface vers la racine
       - name: Build Clean Index from Template
         run: |
           cp template/index.html ./index.html
           echo "Index cloné avec succès : $(wc -c < ./index.html) octets."
 
-      # CORRECTIF : Sauvegarde globale et sécurisée des images et de l'index sur votre historique GitHub
+      # 6. Sauvegarde globale et sécurisée adaptée aux fichiers générés (Résout l'erreur pathspec 128)
       - name: Pousser les fichiers corriges sur GitHub
         run: |
           git config --local user.name "Doriath-Map-Bot"
           git config --local user.email "actions@github.com"
           
-          # Ajoute l'index, les fichiers de données des deeds et toutes les images du relief générées
-          git add index.html data/*.json images/*.png app/map.js
+          git add index.html || true
+          git add app/map.js || true
           
-          # Effectue la sauvegarde uniquement s'il y a des changements réels détectés
+          if [ -d "data" ]; then git add data/; fi
+          if [ -d "images" ]; then git add images/; fi
+          
           if ! git diff-index --quiet HEAD --; then
             git commit -m "Mise a jour automatique WurmMapGen v2.33 [skip ci]"
             git push origin main
-            echo "Succès : L'index et les images ont été sauvegardés sur votre dépôt !"
+            echo "Succès : Les fichiers modifiés ont été enregistrés sur votre dépôt GitHub !"
           else
-            echo "Aucune modification détectée."
+            echo "Aucune modification détectée dans les fichiers."
           fi
 
-      # Préparation de l'envoi vers le site web
+      # 7. Préparation de l'envoi vers l'hébergement web
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
 
-      # Déploiement final en ligne
+      # 8. Déploiement final en ligne sur GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
 
 
 
