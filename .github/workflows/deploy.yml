@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      # MODIFIEZ CECI AVEC LE NOM EXACT DE VOTRE MONDE
-      NOM_MONDE: "Doriath-4k-20"
     steps:
       - name: Checkout Engine
         uses: actions/checkout@v4
@@ -21,12 +18,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y openssh-client sshpass
           
-          # Connexion et recherche dynamique du dossier par le nom du monde
+          # Connexion directe au dossier sqlite
           sshpass -p "${{ secrets.LEGION_PASS }}" sftp -o StrictHostKeyChecking=no -P ${{ secrets.LEGION_PORT }} ${{ secrets.LEGION_USER }}@${{ secrets.LEGION_HOST }} <<EOF
-          # On cherche le répertoire qui contient le nom de votre monde
-          cd $(find /home/container -type d -name "$NOM_MONDE" | head -n 1)/sqlite
-          
-          # Téléchargement des bases de données
+          cd /home/container/dist/Doriath-4k-20/sqlite
           get wurmplayers.db
           get wurm.db
           bye
@@ -35,10 +29,6 @@ jobs:
       - name: Generate Map
         run: |
           java -jar WurmMapGen.jar
-
-      - name: Clone Site Web
-        run: |
-          git clone https://x-access-token:${{ secrets.MY_DEPLOY_TOKEN }}@github.com/LaTrouTe11/wurm-livemap-doriath.git
 
       - name: Copy Maps to Site
         run: |
