@@ -1,4 +1,3 @@
-
 name: Generateur et Liaison Inter-Depots
 
 on:
@@ -34,7 +33,7 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Generation de l arborescence par le JAR
+      - name: 4. Generation des 256 Images du Terrain
         run: |
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
@@ -60,28 +59,37 @@ jobs:
           mkdir -p output_tiles/images output_tiles/data
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           
+          cat << 'EOF' > template/index.html
+          <!DOCTYPE html>
+          <html><head><title>WurmMapGen</title></head><body></body></html>
+          EOF
+          
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Aspiration Absolue du Cache de template
+      - name: 5. Téléchargement et Reconstruction de l Arborescence Officielle
         run: |
-          mkdir -p /tmp/site_propre
+          mkdir -p /tmp/site_complet
           
-          # FIX DÉFINITIF : Le robot copie tout le contenu du vrai dossier template généré par Java
-          if [ -d "template" ]; then
-            cp -rf template/* /tmp/site_propre/
+          # TÉLÉCHARGEMENT DIRECT : Récupération des dossiers systèmes officiels depuis le dépôt source officiel de l'outil
+          git clone --depth=1 https://github.com /tmp/wurm_source
+          
+          # Copie de l'intégralité de l'interface web officielle (app, css, markers, dist, includes)
+          if [ -d "/tmp/wurm_source/template" ]; then
+            cp -rf /tmp/wurm_source/template/* /tmp/site_complet/
           fi
-          
-          # Fusion et remontée forcée des images PNG et JSON calculées
-          mkdir -p /tmp/site_propre/images /tmp/site_propre/data
-          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
-          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
-          cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
-          cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
+          rm -rf /tmp/wurm_source
 
-          # Réécriture forcée du fichier config.json requis par main.js pour débloquer l affichage Leaflet
-          cat << 'EOF' > /tmp/site_propre/data/config.json
+          # Injection et fusion forcée des dalles PNG et JSON générées pour Doriath
+          mkdir -p /tmp/site_complet/images /tmp/site_complet/data
+          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_complet/data/ 2>/dev/null || true; fi
+          cp -f *.png /tmp/site_complet/images/ 2>/dev/null || true
+          cp -f *.json /tmp/site_complet/data/ 2>/dev/null || true
+
+          # FIX DE LA LIGNE 68 : Écriture forcée du fichier config.json requis par main.js
+          cat << 'EOF' > /tmp/site_complet/data/config.json
           {
             "serverName": "[QC/FR/CAN] QBC Doriath",
             "actualMapSize": 4096,
@@ -106,14 +114,14 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Deploiement de l Arborescence Miroir Absolue vers Depot 1
+      - name: 7. Deploiement de l Arborescence Miroir Totale vers Depot 1
         run: |
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Copie miroir complète de l ensemble de l écosystème d origine
-          cp -rf /tmp/site_propre/* espace_depot1/
+          # Copie miroir complète de l'interface officielle fusionnée
+          cp -rf /tmp/site_complet/* espace_depot1/
           
-          # Francisation automatique du fichier HTML d origine s il existe pour éliminer les accolades
+          # Francisation automatique du fichier HTML d'origine pour éliminer les accolades
           if [ -f "espace_depot1/index.html" ]; then
             sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' espace_depot1/index.html 2>/dev/null || true
             sed -i 's/Show deeds/Afficher les villages/g' espace_depot1/index.html 2>/dev/null || true
@@ -125,9 +133,8 @@ jobs:
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add -A .
-          git commit -m "Console QBC 2026 : Déploiement de l'arborescence complète template" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Force push de l'arborescence officielle complète" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
-
 
 
 
