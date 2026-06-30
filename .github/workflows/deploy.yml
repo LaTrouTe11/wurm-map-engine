@@ -79,7 +79,7 @@ jobs:
           <body>
               <div id="sidebar">
                   <h1>QBC Doriath</h1>
-                  <p>Interactive LiveMap • 2026</p>
+                  <p>Interactive LiveMap • Console QBC 2026</p>
                   <div style="font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; margin-bottom: 10px;">Calques</div>
                   <label class="filter-item"><input type="checkbox" id="chk-villages" checked onchange="toggleLayer('villages')"> Villages (Deeds)</label>
                   <label class="filter-item"><input type="checkbox" id="chk-towers" checked onchange="toggleLayer('towers')"> Tours de garde</label>
@@ -115,25 +115,25 @@ jobs:
           </html>
           EOF
 
-      - name: 6. Connexion Git Native et Extraheader Obligatoire
+      # FIX DE SÉCURITÉ : Indiquez ici le chemin vers votre Dépôt 1 (Site Web)
+      - name: 6. Ouverture automatique du Depot 1 via Action Officielle
+        uses: actions/checkout@v4
+        with:
+          repository: 'latroute11/wurm-livemap-doriath'
+          token: ${{ secrets.MY_DEPLOY_TOKEN }}
+          path: 'espace_depot1'
+
+      # TRANSFERT ET PUSH NATIF
+      - name: 7. Transfert et Envoi du site web complet
         run: |
-          git config --global user.name "Robot Coordinateur Wurm"
-          git config --global user.email "action@github.com"
+          mkdir -p espace_depot1/images espace_depot1/data
+          cp -rf /tmp/site_propre/* espace_depot1/
           
-          # FIX DÉFINITIF : Authentification via injection d'en-tête globale HTTP (Bannit l'erreur No Host)
-          git config --global http.https://github.com "Authorization: basic $(echo -n x:${{ secrets.MY_DEPLOY_TOKEN }} | base64)"
-          
-          # Clonage via l'adresse URL publique standard épurée
-          git clone https://github.com /tmp/sync_depot1
-          
-          # Transfert et copie des nouveaux paquets
-          mkdir -p /tmp/sync_depot1/images /tmp/sync_depot1/data
-          cp -rf /tmp/site_propre/* /tmp/sync_depot1/
-          
-          # Push sécurisé
-          cd /tmp/sync_depot1
+          cd espace_depot1
+          git config user.name "Robot Coordinateur Wurm"
+          git config user.email "action@github.com"
           git add .
-          git diff-index --quiet HEAD || git commit -m "Console QBC 2026 : synchronisation reussie par extraheader"
+          git diff-index --quiet HEAD || git commit -m "Console QBC 2026 : deploiement securise inter-depots valide"
           git push origin main --force || git push origin master --force
 
 
