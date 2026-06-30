@@ -1,3 +1,4 @@
+
 name: Generateur et Liaison Inter-Depots
 
 on:
@@ -33,7 +34,7 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Generation des 256 Images du Terrain
+      - name: 4. Generation de l arborescence par le JAR
         run: |
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
@@ -62,26 +63,24 @@ jobs:
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Extraction et Assemblage du Pack Racine Absolu 2026
+      - name: 5. Aspiration Absolue du Cache de template
         run: |
-          mkdir -p /tmp/site_propre/images /tmp/site_propre/data /tmp/site_propre/app /tmp/site_propre/css /tmp/site_propre/markers /tmp/site_propre/dist /tmp/site_propre/includes
+          mkdir -p /tmp/site_propre
           
-          # 1. Extraction et aspiration de TOUS les répertoires d'interface générés en cache par l'application
+          # FIX DÉFINITIF : Le robot copie tout le contenu du vrai dossier template généré par Java
           if [ -d "template" ]; then
             cp -rf template/* /tmp/site_propre/
           fi
-
-          # 2. Rapatriement forcé des sous-dossiers systèmes WurmMapGen s'ils ont été créés à la racine
-          cp -rf app/ css/ markers/ dist/ includes/ /tmp/site_propre/ 2>/dev/null || true
           
-          # 3. Rapatriement et remontée des tuiles géographiques PNG et JSON
+          # Fusion et remontée forcée des images PNG et JSON calculées
+          mkdir -p /tmp/site_propre/images /tmp/site_propre/data
           if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
           cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
 
-          # 4. Écriture forcée du fichier de configuration requis par main.js pour débloquer l'affichage
+          # Réécriture forcée du fichier config.json requis par main.js pour débloquer l affichage Leaflet
           cat << 'EOF' > /tmp/site_propre/data/config.json
           {
             "serverName": "[QC/FR/CAN] QBC Doriath",
@@ -107,14 +106,14 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Deploiement de l Arborescence Miroir Totale vers Depot 1
+      - name: 7. Deploiement de l Arborescence Miroir Absolue vers Depot 1
         run: |
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Copie miroir complète de l'ensemble de l'écosystème graphique
+          # Copie miroir complète de l ensemble de l écosystème d origine
           cp -rf /tmp/site_propre/* espace_depot1/
           
-          # Correction textuelle à la volée du gabarit HTML s'il existe pour boucher les trous de rendu
+          # Francisation automatique du fichier HTML d origine s il existe pour éliminer les accolades
           if [ -f "espace_depot1/index.html" ]; then
             sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' espace_depot1/index.html 2>/dev/null || true
             sed -i 's/Show deeds/Afficher les villages/g' espace_depot1/index.html 2>/dev/null || true
@@ -126,7 +125,7 @@ jobs:
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add -A .
-          git commit -m "Console QBC 2026 : Injection complète de tous les dossiers racines système" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Déploiement de l'arborescence complète template" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
 
 
