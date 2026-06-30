@@ -33,8 +33,9 @@ jobs:
                    get -O . top_layer.map; \
                    bye"
 
-      - name: 4. Generation de la structure complete par le JAR
+      - name: 4. Extraction et Preparation de l Arborescence d Origine
         run: |
+          # 1. Écriture de la configurationproperties
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
           wurmMapLocation=.
@@ -56,24 +57,31 @@ jobs:
           rmiPassword=${{ secrets.RMI_PASSWORD }}
           EOF
 
-          # Création préalable de la structure requise pour l'écriture Java
+          # 2. Récupération des composants d'interface orignaux absents
+          git clone https://github.com /tmp/source_web
+          mkdir -p template
+          cp -rf /tmp/source_web/app /tmp/source_web/css /tmp/source_web/markers /tmp/source_web/dist /tmp/source_web/includes template/ 2>/dev/null || true
+          cp -f /tmp/source_web/index.html template/ 2>/dev/null || true
+          rm -rf /tmp/source_web
+
+          # 3. Alignement des structures de dossiers requises
           mkdir -p output_tiles/images output_tiles/data
           mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           
+          # 4. Lancement sécurisé du générateur Java
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Assemblage du Site Complet Original Francisé
+      - name: 5. Assemblage du Site Complet Original Stabilisé
         run: |
-          # 1. Création de la zone d'assemblage temporaire
           mkdir -p /tmp/site_complet
           
-          # 2. COPIE INTÉGRALE de toute l'arborescence générée par le programme original dans le template
+          # 1. Copie miroir de toute la structure d'origine reconstruite
           if [ -d "template" ]; then
             cp -rf template/* /tmp/site_complet/
           fi
           
-          # 3. Injection forcée des dalles PNG et JSON générées par sécurité
+          # 2. Rapatriement forcé des dalles PNG et JSON générées par l'outil
           mkdir -p /tmp/site_complet/images /tmp/site_complet/data
           if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_complet/images/ 2>/dev/null || true; fi
@@ -81,8 +89,7 @@ jobs:
           cp -f *.png /tmp/site_complet/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_complet/data/ 2>/dev/null || true
 
-          # 4. FIX LINUX EN DUR DU SCRIPT MAIN.JS (Répare le crash TypeError actualMapSize de la ligne 68)
-          # On injecte la configuration JSON attendue directement là où main.js va la lire
+          # 3. FIX DE SÉCURITÉ DE LA LIGNE 68 : Écriture forcée du fichier JSON attendu par main.js
           cat << 'EOF' > /tmp/site_complet/data/config.json
           {
             "serverName": "[QC/FR/CAN] QBC Doriath",
@@ -101,7 +108,7 @@ jobs:
           }
           EOF
 
-          # 5. Traduction et correction de secours du fichier index.html d'origine pour Leaflet
+          # 4. Correction textuelle des balises de Leaflet pour éviter l'écran noir
           if [ -f "/tmp/site_complet/index.html" ]; then
             sed -i 's/map.unproject(\[,\s*\]/map.unproject(\[0,0\]/g' /tmp/site_complet/index.html 2>/dev/null || true
             sed -i 's/{{serverName}}/[QC\/FR\/CAN] QBC Doriath/g' /tmp/site_complet/index.html 2>/dev/null || true
@@ -117,20 +124,20 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Deploiement de l'Arborescence Root Absolute vers Depot 1
+      - name: 7. Deploiement de la Structure Miroir Absolue vers Depot 1
         run: |
-          # On s'assure de créer tous les répertoires d'infrastructure d'origine
           mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
           
-          # Copie miroir absolue de toutes les pièces du puzzle d'origine
+          # Transfert miroir complet
           cp -rf /tmp/site_complet/* espace_depot1/
           
           cd espace_depot1
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add -A .
-          git commit -m "Console QBC 2026 : Deploiement miroir complet avec correction config.json" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Integration totale et resolution de l erreur de ligne 68" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
