@@ -15,10 +15,10 @@ jobs:
       - name: 1. Checkout du Depot 2 (Générateur)
         uses: actions/checkout@v4
 
-      - name: 2. Installation des paquets requis
+      - name: 2. Installation des paquets requis et des Polices
         run: |
           sudo apt-get update
-          sudo apt-get install -y lftp openjdk-17-jre
+          sudo apt-get install -y lftp openjdk-17-jre fontconfig
 
       - name: 3. Telechargement des donnees Legion Hosting
         run: |
@@ -35,7 +35,6 @@ jobs:
 
       - name: 4. Generation des 256 Images du Terrain
         run: |
-          # 1. ÉCRITURE FORCÉE DE LA CONFIGURATION EN DUR POUR LE JAR
           cat << 'EOF' > WurmMapGen.properties
           serverName=[QC/FR/CAN] QBC Doriath
           wurmMapLocation=.
@@ -57,30 +56,31 @@ jobs:
           rmiPassword=${{ secrets.RMI_PASSWORD }}
           EOF
 
-          # 2. Création des dossiers de travail requis
+          # Création de la structure complète pour forcer Java à tout écrire de manière visible
           mkdir -p output_tiles/images output_tiles/data
+          mkdir -p template/app template/css template/data template/images template/markers template/dist template/includes
           
-          # 3. Droits d exécution
           chmod +x WurmMapGen.jar
-          
-          # 4. Lancement forcé du générateur Java
           java -Djava.awt.headless=true -jar WurmMapGen.jar
 
-      - name: 5. Creation du Pack Web Propre Complet 2026
+      - name: 5. Creation du Pack Web Propre Complet 2026 Visible
         run: |
-          mkdir -p /tmp/site_propre/images /tmp/site_propre/data
+          # Création de l'arborescence complète qui sera envoyée sur le Dépôt 1
+          mkdir -p /tmp/site_propre/images /tmp/site_propre/data /tmp/site_propre/app /tmp/site_propre/css /tmp/site_propre/markers /tmp/site_propre/dist /tmp/site_propre/includes
           
-          # Extraction et copie des tuiles depuis le nouveau dossier de sauvegarde propre
-          if [ -d "output_tiles/images/5" ]; then
-            cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true
+          # Copie de absolument tous les dossiers de l'application Wurm pour les rendre visibles
+          if [ -d "template" ]; then
+            cp -rf template/* /tmp/site_propre/ 2>/dev/null || true
           fi
-          cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true
-          cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true
-          cp -rf template/images/*.png /tmp/site_propre/images/ 2>/dev/null || true
+          
+          # Rapatriement forcé des tuiles PNG générées dans le dossier visible principal
+          if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
+          if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
           cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
 
-          # Fabrication de l index HTML stabilisé sans aucun espace vide (Protection IA)
+          # Écriture de l'index d'affichage Leaflet stabilisé et francisé
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -115,7 +115,6 @@ jobs:
                   window.addEventListener('load', function() {
                       var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
                       
-                      // Fixation géométrique forcée : 0, 0 à 4096, 4096
                       var p1 = map.unproject([0, 0], 5);
                       var p2 = map.unproject([4096, 4096], 5);
                       var bounds = new L.LatLngBounds(p1, p2);
@@ -152,17 +151,21 @@ jobs:
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Transfert et Envoi du site web complet
+      - name: 7. Transfert et Envoi de l Arborescence Complete
         run: |
-          mkdir -p espace_depot1/images espace_depot1/data
+          # On s'assure que tous les dossiers de réception existent sur le site web
+          mkdir -p espace_depot1/images espace_depot1/data espace_depot1/app espace_depot1/css espace_depot1/markers espace_depot1/dist espace_depot1/includes
+          
+          # Transfert global de toute la structure
           cp -rf /tmp/site_propre/* espace_depot1/
           
           cd espace_depot1
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add .
-          git commit -m "Console QBC 2026 : Generation complete des 256 images" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Affichage de l arborescence complete des dossiers" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
