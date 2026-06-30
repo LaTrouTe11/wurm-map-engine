@@ -67,18 +67,18 @@ jobs:
           
           chmod +x WurmMapGen.jar
           java -Djava.awt.headless=true -jar WurmMapGen.jar
-      - name: 5. Creation du Pack Web et Laboratoire de Diagnostic
+      - name: 5. Creation du Pack Web Autonome Immediat
         run: |
           mkdir -p /tmp/site_propre/images /tmp/site_propre/data
           
-          # Extraction et remontée forcée des tuiles PNG et JSON calculées
+          # Extraction et copie des tuiles (zoom maximal ou racine)
           if [ -d "output_tiles/images/5" ]; then cp -rf output_tiles/images/5/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/images" ]; then cp -rf output_tiles/images/*.png /tmp/site_propre/images/ 2>/dev/null || true; fi
           if [ -d "output_tiles/data" ]; then cp -rf output_tiles/data/*.json /tmp/site_propre/data/ 2>/dev/null || true; fi
           cp -f *.png /tmp/site_propre/images/ 2>/dev/null || true
           cp -f *.json /tmp/site_propre/data/ 2>/dev/null || true
 
-          # 🧪 RAPPORT 1 : diagnostic.txt
+          # 🧪 RAPPORT : diagnostic.txt
           echo "=== RAPPORT DE DIAGNOSTIC LIVE MAP QBC ===" > /tmp/site_propre/diagnostic.txt
           echo "Date d'execution : $(date)" >> /tmp/site_propre/diagnostic.txt
           echo "Nombre total de tuiles PNG generees : $(ls -1 /tmp/site_propre/images/*.png 2>/dev/null | wc -l)" >> /tmp/site_propre/diagnostic.txt
@@ -86,30 +86,7 @@ jobs:
           echo "Taille totale du dossier d'images : $(du -sh /tmp/site_propre/images | cut -f1)" >> /tmp/site_propre/diagnostic.txt
           echo "==========================================" >> /tmp/site_propre/diagnostic.txt
 
-          # 🧪 RAPPORT 2 : test_render.html (Moteur Leaflet brut)
-          cat << 'EOF' > /tmp/site_propre/test_render.html
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>LABORATOIRE DE TEST - QBC</title>
-              <link rel="stylesheet" href="https://unpkg.com" />
-              <script src="https://unpkg.com"></script>
-              <style>html, body, #test-map { width: 100%; height: 100%; margin: 0; padding: 0; background: #000; }</style>
-          </head>
-          <body>
-              <div id="test-map"></div>
-              <script>
-                  var map = L.map('test-map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5 });
-                  var bounds = [[0, 0], [4096, 4096]];
-                  map.fitBounds(bounds);
-                  L.tileLayer('images/{x}-{y}.png', { tileSize: 256, noWrap: true, tms: true }).addTo(map);
-                  L.marker([2048, 2048]).addTo(map).bindPopup("<b>Centre de Doriath</b><br>Si ce message s'affiche, Leaflet fonctionne !").openPopup();
-              </script>
-          </body>
-          </html>
-          EOF
-
-          # Index d'affichage direct Leaflet standard et francisé
+          # ÉCRITURE DE L INDEX INTERACTIF ULTRA-STABLE (Bannit les scripts morts)
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -143,7 +120,8 @@ jobs:
               <script>
                   window.addEventListener('load', function() {
                       var map = L.map('map', { crs: L.CRS.Simple, minZoom: 0, maxZoom: 5, zoomControl: true, attributionControl: false });
-                      var bounds = [[0, 0], [4096, 4096]];
+                      
+                      var bounds = new L.LatLngBounds(map.unproject([0, 0], 5), map.unproject([4096, 4096], 5));
                       map.fitBounds(bounds);
                       map.setZoom(2);
                       
@@ -172,27 +150,29 @@ jobs:
           </html>
           EOF
 
-      - name: 6. Ouverture automatique du Depot 1 via l Action Officielle
+      - name: 6. Ouverture securisee du Depot 1 via l Action Officielle
         uses: actions/checkout@v4
         with:
           repository: 'LaTrouTe11/wurm-livemap-doriath'
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      - name: 7. Purge Miroir et Envoi des rapports de test
+      - name: 7. Nettoyage et Envoi Épuré
         run: |
+          # Suppression de l'ancienne arborescence défaillante pour anéantir la page blanche
           rm -rf espace_depot1/* 2>/dev/null || true
           mkdir -p espace_depot1/images espace_depot1/data
           
-          # Copie globale du pack web stabilisé et des diagnostics
+          # Copie des fichiers épurés
           cp -rf /tmp/site_propre/* espace_depot1/
           
           cd espace_depot1
           git config user.name "Robot Coordinateur Wurm"
           git config user.email "action@github.com"
           git add .
-          git commit -m "Console QBC 2026 : Laboratoire de diagnostic actif" || echo "Déjà à jour"
+          git commit -m "Console QBC 2026 : Allumage de la carte sans page blanche" || echo "Déjà à jour"
           git push origin main --force || git push origin master --force
+
 
 
 
