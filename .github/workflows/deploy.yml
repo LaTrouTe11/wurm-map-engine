@@ -58,6 +58,7 @@ jobs:
           find . -maxdepth 1 -name "*.png" -exec cp -f {} /tmp/site_propre/images/ \; 2>/dev/null || true
           find . -maxdepth 1 -name "*.json" -exec cp -f {} /tmp/site_propre/data/ \; 2>/dev/null || true
 
+          # Écriture de l'index d'affichage direct Leaflet sans trou géométrique
           cat << 'EOF' > /tmp/site_propre/index.html
           <!DOCTYPE html>
           <html lang="fr">
@@ -115,15 +116,15 @@ jobs:
           </html>
           EOF
 
-      # FIX DE SÉCURITÉ : Indiquez ici le chemin vers votre Dépôt 1 (Site Web)
+      # FIX DE SÉCURITÉ INTÉGRAL : Utilisation de ton vrai profil GitHub exact "LaTrouTe11"
       - name: 6. Ouverture automatique du Depot 1 via Action Officielle
         uses: actions/checkout@v4
         with:
-          repository: 'latroute11/wurm-livemap-doriath'
+          repository: 'LaTrouTe11/wurm-livemap-doriath'
           token: ${{ secrets.MY_DEPLOY_TOKEN }}
           path: 'espace_depot1'
 
-      # TRANSFERT ET PUSH NATIF
+      # TRANSFERT ET PUSH NATIF TOTALEMENT AUTONOME
       - name: 7. Transfert et Envoi du site web complet
         run: |
           mkdir -p espace_depot1/images espace_depot1/data
